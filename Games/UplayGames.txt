@@ -1,0 +1,462 @@
+61517|A Normal Lost Phone
+221|Air Conflicts: Pacific Carriers
+248|Alan Wake
+264|Alan Wake Collector's Edition
+309|Alan Wake's American Nightmare
+6245|Anno 117: Pax Romana (Steam (Demo)
+89|Anno 1404
+16232|Anno 1404 - History Edition
+16234|Anno 1503 - History Edition
+2990|Anno 1602
+16236|Anno 1602 - History Edition
+16238|Anno 1701 - History Edition
+4553|Anno 1800 (Uplay)
+4554|Anno 1800 (Uplay+Steam)
+13800|Anno 1800 - (Open Beta)
+22|Anno 2070
+71|Anno 2070 (Steam)
+45|Anno 2070 (Beta)
+680|Anno 2070 (Rus)
+678|ANNO 2070® Complete Edition
+1253|Anno 2205
+2052|Anno 2205 (unknown Version)
+289|ArmA 2
+284|ArmA 2 - Private Military Company
+283|ArmA 2 Operation Arrowhead
+288|ArmA 2: British Armed Forces DLC
+281|Arma: Cold War Assault
+82|Assassin's Creed
+26|Assassin's Creed Brotherhood
+57|Assassin's Creed Brotherhood
+4|Assassin's Creed II
+56|Assassin's Creed II
+4919|Assassin's Creed II (Steam Version)
+54|Assassin's Creed III
+102|Assassin's Creed III
+139|Assassin's Creed III
+128|Assassin's Creed III - Benedict Arnold
+105|Assassin's Creed III (CZ)
+104|Assassin's Creed III (JPN)
+103|Assassin's Creed III (Rus)
+117|Assassin's Creed III - The Battle Hardened Pack
+116|Assassin's Creed III - The Hidden Secrets Pack
+118|Assassin's Creed III - The Tyranny of King Washington Episode 1: The Infamy
+119|Assassin's Creed III - The Tyranny of King Washington Episode 2: The Betrayal
+4923|Assassin's Creed Origins (Steam Version)
+40|Assassin's Creed Revelations
+59|Assassin's Creed Revelations
+97|Assassin's Creed Revelations - The Lost Archive
+1186|Assassin's Creed Rogue (Rus)
+1187|Assassin's Creed Rogue (Rus) (Steam Version)
+1661|Assassin's Creed Rogue (Asia)
+1662|Assassin's Creed Rogue (Asia) (Steam)
+944|Assassin's Creed Unity (Rus)
+945|Assassin's Creed Unity (Rus) (Steam Version)
+1651|Assassin's Creed® Chronicles China
+1841|Assassin's Creed® Chronicles China (Steam Version)
+1847|Assassin's Creed® Chronicles India
+1849|Assassin's Creed® Chronicles India (Steam)
+1848|Assassin's Creed® Chronicles Russia
+1850|Assassin's Creed® Chronicles Russia (Steam)
+664|Assassin's Creed® Freedom Cry
+54|Assassin's Creed® III
+105|Assassin's Creed® III (CZ)
+104|Assassin's Creed® III (JPN)
+103|Assassin's Creed® III (Rus)
+5183|Assassin's Creed® III - Remastered
+5184|Assassin's Creed® III - Remastered (Steam Version)
+625|Assassin's Creed® Liberation HD
+632|Assassin's Creed® Liberation HD (Uplay version/Australia)
+6100|Assassin's Creed® Mirage
+6101|Assassin's Creed® Mirage (Steam)
+5059|Assassin's Creed® Odyssey
+5092|Assassin's Creed® Odyssey (Steam Version)
+3539|Assassin's Creed® Origins
+40|Assassin's Creed® Revelations
+895|Assassin's Creed® Rogue
+934|Assassin's Creed® Rogue (Steam Version)
+8006|Assassin's Creed® Shadows
+1081|Assassin's Creed® Shadows (Steam Version)
+1875|Assassin's Creed® Syndicate
+1955|Assassin's Creed® Syndicate (Rus)
+1958|Assassin's Creed® Syndicate (Rus) (Steam Version)
+1957|Assassin's Creed® Syndicate (Steam Version)
+1956|Assassin's Creed® Syndicate (Asia)
+720|Assassin's Creed® Unity
+857|Assassin's Creed® Unity (Steam)
+13504|Assassin's Creed® Valhalla
+7013|Assassin's Creed® Valhalla (Steam)
+82|Assassin's Creed™
+273|Assassin’s Creed® IV Black Flag™
+442|Assassin’s Creed® IV Black Flag™ (Asia)
+441|Assassin’s Creed® IV Black Flag™ (Rus)
+437|Assassin’s Creed® IV Black Flag™ (Steam Version)
+61503|Astrologaster
+5093|Avatar: Frontier of Pandora (Steam)
+4740|Avatar: Frontier of Pandora (Uplay)
+313|Babel Rising
+330|Bastion
+134|Batman: Arkham Asylum GOTY Edition
+123|Batman: Arkham City GOTY
+225|Battlefield 3™ Premium Edition
+232|Beyond Good and Evil™
+266|Blazing Angels
+267|Blazing Angels 2: Secret Missions of WWII
+312|Bloody Good Time
+271|Brothers in Arms: Earned in Blood
+272|Brothers in Arms: Hell's Highway
+270|Brothers in Arms: Road to Hill 30
+112|Call of Juarez 2: Bound in blood
+37|Call of Juarez The Cartel
+294|Carrier Command: Gaea Mission
+825|Champions of Anteria
+2170|Champions of Anteria (Steam)
+3097|Champions of Anteria (Demo)
+3098|Champions of Anteria (Demo) (Steam)
+609|Child of Light
+611|Child of Light (Steam)
+801|Child of Light (Demo)
+216|Chivalry: Medieval Warfare
+233|Cold Fear™
+132|Crusader Kings II
+255|Crysis 3
+245|Crysis Maximum
+219|Crysis® 2 Maximum Edition
+230|Crysis® 3
+256|Dead Space 3
+208|Dead Space™
+209|Dead Space™ 2
+229|Dead Space™ 3
+306|Defenders of Ardania
+214|Deus Ex: Human Revolution
+335|Deus Ex: Human Revolution™ - Augmented Edition
+5100|Discovery Tour by Assassin's Creed: Ancient Egypt
+11373|Discovery Tour: Ancient Egypt by Assassin’s Creed (Steam)
+5404|Discovery Tour: Ancient Greece
+19000|Discovery Tour: Viking Age
+424|Driver San Francisco 大概 (Steam)
+252|DRIVER: PARALLEL LINES
+13|Driver: San Francisco
+55|Driver: San Francisco
+237|Endless Space Admiral Edition
+201|Endless Space Emperor Edition
+303|Europa Universalis III Chronicles
+61499|Evan's Remains
+331|F.E.A.R.
+332|F.E.A.R. 2: Project Origin
+333|F.E.A.R. 2: Reborn DLC
+334|F.E.A.R. 3
+254|Faces of War (tm) (title shown as Dead Space 3)
+84|Far Cry
+85|Far Cry 2
+971|Far Cry 4
+969|Far Cry 4 (Rus)
+46|Far Cry® 3
+101|Far Cry® 3
+217|Far Cry® 3 - High Tides
+205|Far Cry® 3 Blood Dragon
+316|Far Cry 3 - Blood Dragon
+420|Far Cry® 4
+856|Far Cry® 4 (Steam version/Australia)
+1803|Far Cry® 5
+4311|Far Cry® 5 (Steam Version)
+5266|Far Cry® 6
+920|Far Cry® 6 (Steam Version)
+17772|Far Cry® 6 Episode 1 Insanity DLC
+17773|Far Cry® 6 Episode 2 Pagan: Control DLC
+17774|Far Cry® 6 Episode 3 Joseph: Collapse DLC
+19028|Far Cry® 6 Offline Mode "DLC"
+5210|Far Cry® New Dawn
+5211|Far Cry® New Dawn (Steam Version)
+2010|Far Cry® Primal
+2029|Far Cry® Primal (Steam version/Australia)
+61432|Fell Seal: Arbiter's Mark
+224|FIFA 13
+231|FIFA Manager 13
+422|Flashback
+423|Flashback (Demo)
+569|For Honor
+3458|For Honor
+30|From Dust
+64|From Dust
+222|Galaxy on Fire 2™ Full HD
+114|Ghost Recon Advanced Warfighter 2
+53|Ghost Recon Future Soldier
+65|Ghost Recon Future Soldier
+115|Ghost Recon Future Soldier - Arctic Strike DLC Pack
+257|Ghost Recon Future Soldier - Khyber Strike DLC Pack
+204|Ghost Recon Future Soldier - Raven Strike DLC
+86|H.A.W.X
+21|H.A.W.X 2
+62|H.A.W.X 2
+122|H.A.W.X 2 - All-in-One DLC Pack
+352|Heroes of Might & Magic II Gold Edition
+87|Heroes of Might and Magic V
+146|Heroes of Might and Magic V: Hammers of Fate
+147|Heroes of Might and Magic V: Tribes of the East
+353|Heroes® of Might & Magic® III Complete Edition
+354|Heroes® of Might & Magic® IV Complete Edition
+212|Hitman: Absolution
+234|Hitman: Absolution Pro Edition
+131|Hoyle Card Games 2012
+148|Hoyle Casino Games 2012
+215|Hoyle Puzzle and Board Games 2012
+5870|Hungry Shark World
+11957|Hyper Scape
+93|I am Alive
+295|IL-2 Sturmovik - Cliffs of Dover
+5726|Immortal Fenyx Rising™ (Demo)
+5405|Immortals Fenyx Rising
+62326|Immortals Fenyx Rising (Steam)
+3050|Imperialism
+3051|Imperialism 2
+213|Just Cause 2
+3130|Just Dance 2017
+3131|Just Dance 2017 (Steam)
+241|King's Bounty: Warriors of the North
+228|Kingdoms of Amalur: Reckoning™
+61515|Lake
+143|LEGO Batman 2
+142|LEGO Batman: The Videogame
+124|Lego Harry Potter
+125|LEGO Harry Potter: Years 5-7
+144|LEGO The Lord of the Rings
+688|Lock On
+203|Magicka
+218|Mass Effect™ 3 N7 Digital Deluxe Edition
+137|Medal of Honor™ Warfighter
+242|Men of War: Assault Squad
+5613|Might & Magic - Chess Royale
+296|Might & Magic Clash of Heroes
+44|Might & Magic Heroes VI
+48|Might & Magic Heroes VI
+60|Might & Magic Heroes VI
+5042|Might & Magic Heroes VI
+25|Might & Magic Heroes VI (Beta)
+1176|Might & Magic Heroes VII
+1177|Might & Magic Heroes VII (Steam)
+402|Might & Magic X Legacy (Steam)
+401|Might & Magic X Legacy (Uplay)
+403|Might & Magic X Legacy (Uplay+Steam)
+350|Might & Magic® IX
+64|Might & Magic® VI-Pack
+349|Might & Magic® VIII: Day of the Destroyer
+348|Might and Magic VII: For Blood and Honor
+323|Mirror's Edge
+17905|Monopoly Madness
+3774|Monopoly Plus
+3775|Monopoly Plus (Steam)
+324|Need for Speed The (Rus)
+136|Need for Speed™ Most Wanted
+9797|Ode
+246|Orcs Must Die! 2
+280|Orcs Must Die! 2 - Are We There Yeti? DLC
+279|Orcs Must Die! 2 - Family Ties DLC
+278|Orcs Must Die! 2 - Fire & Water DLC
+238|Painkiller Hell & Damnation
+263|Painkiller Hell & Damnation Collector's Edition
+2993|Panzer General 2
+2992|Panzer General 3D Assault
+52|Party Example
+693|Petz Horsez 2
+325|Plants VS Zombies
+3044|POD Gold
+276|Prince of Persia
+277|Prince of Persia (2008)
+11|Prince of Persia The Forgotten Sands
+63|Prince of Persia The Forgotten Sands
+6145|Prince of Persia: The Lost Crown
+111|Prince of Persia: The Sands of Time™
+113|Prince of Persia: The Two Thrones™
+121|Prince of Persia: Warrior Within™
+11|Prince of Persia® The Forgotten Sands™
+60951|Project U
+12|R.U.S.E.™
+61578|Rabbids: Party of Legends
+5408|Rabbits Coding!
+509|Rayman Chinese Special Edition
+5860|Rayman Fiesta Run
+2968|Rayman Forever
+5850|Rayman Jungle Run
+411|Rayman Legends (Demo)
+80|Rayman Origins
+362|Rayman Raving Rabbids™
+361|Rayman® 2 The Great Escape
+360|Rayman® 3 Hoodlum Havoc®
+410|Rayman® Legends
+5487|Riders Republic
+5480|Riders Republic (Steam)
+247|Rochard
+268|Rocksmith™
+11899|Roller Champions
+5705|Scott Pilgrim vs the World: The Game
+145|Scribblenauts Unlimited
+290|Settlers 5: Heritage of Kings
+291|Settlers 6 Gold Edition
+61|Settlers 7
+27|Settlers 7 Balance
+16|Settlers 7 (Beta)
+17|Settlers 7 (Demo)
+20|Shaun White Skateboarding
+223|Shoot Many Robots
+126|Shootmania Storm
+540|ShootMania Storm Elite (Demo)
+2988|Silent Hunter 2
+293|Silent Hunter 4 Gold Edition
+698|Silent Hunter 4 Wolves of the Pacific (Uplay)
+699|Silent Hunter 4 Wolves of the Pacific: U-Boat Missions (Uplay)
+68|Silent Hunter 5
+3|Silent Hunter 5: Battle of the Atlantic
+292|Silent Hunter III
+3|Silent Hunter®: Battle of the Atlantic Gold Edition
+258|SimCity™
+259|SimCity™ Limited Edition
+1713|Skull and Bones
+6150|Skull and Bones (Open Beta) (Closed Beta)
+220|Sleeping Dogs™
+235|Sleeping Dogs™ Limited Edition
+236|Sleeping Dogs™ Low Violence Edition
+4502|South Park: The Fractured But Whole (Steam)
+3584|South Park™ - The Stick of Truth™
+3088|South Park™: The Fractured But Whole™
+3052|Speed Busters: American Highways
+307|SpellForce 2 - Faith in Destiny
+308|SpellForce 2 - Faith in Destiny Digital Deluxe
+95|Splinter Cell Chaos Theory
+2|Splinter Cell Conviction
+58|Splinter Cell Conviction
+96|Splinter Cell Conviction - Deniable Ops: Insurgency
+65601|Star Wars Outlaws (Demo)
+17903|Star Wars: Outlaws
+64181|Star Wars: Outlaws (Steam)
+5277|Starlink: Battle For Atlas
+3279|Steep
+3280|Steep (Steam)
+3445|Steep (Open Beta)
+4472|Steep (Open Beta) (Steam)
+10885|Steep Road To The Olympics (Beta)
+10886|Steep Road To The Olympics (Beta) (Steam)
+33|The Adventures of Tintin: The Game
+239|The Book of Unwritten Tales
+265|The Book of Unwritten Tales Deluxe Edition
+310|The Book of Unwritten Tales: The Critter Chronicles
+311|The Book of Unwritten Tales: The Critter Chronicles Collectors Edition
+750|The Crew (Beta)
+507|The Crew (Russian)
+413|The Crew (Worldwide)
+5037|The Crew 2
+665|The Crew 2 (Steam Version)
+2855|The Crew 2 (Uplay Connect)
+16733|The Crew Motorfest
+922|The Crew Motorfest (Steam)
+6116|The Last Friend
+141|The Lord of the Rings: War in the North
+8005|The Rogue Prince of Persia
+11662|The Settlers - History Edition
+3037|The Settlers - New Allies
+11783|The Settlers 2: Veni, Vidi, Vici - History Edition
+11784|The Settlers 3 - History Edition
+11785|The Settlers 4 - History Edition
+11786|The Settlers 5: Heritage of Kings - History Edition
+11787|The Settlers 6 - History Edition
+8|The Settlers 7: Paths to a Kingdom
+11788|The Settlers 7: Paths to a Kingdom - History Edition
+18|The Settlers Online
+328|The Sims Medieval
+210|The Sims™ 3 Deluxe Edition
+227|The Testament of Sherlock Holmes
+253|The Walking Dead
+329|Tiger Woods PGA Tour 12: The Masters
+138|To The Moon
+83|Tom Clancy's EndWar
+2297|Tom Clancy's Ghost Recon
+53|Tom Clancy's Ghost Recon Future Soldier
+3559|Tom Clancy's Ghost Recon Wildlands (Steam)
+4984|Tom Clancy's Ghost Recon Wildlands (Open Beta)
+11903|Tom Clancy's Ghost Recon® Breakpoint
+12737|Tom Clancy's Ghost Recon® Breakpoint (Uplay Open + Closed Beta)
+1771|Tom Clancy's Ghost Recon® Wildlands
+2970|Tom Clancy's Ghost Recon® Wildlands (Open Beta)
+108|Tom Clancy's Rainbow 6 VEGAS 2
+2298|Tom Clancy's Rainbow Six®
+2235|Tom Clancy's Rainbow Six® 3 Gold
+5271|Tom Clancy's Rainbow Six® Extraction
+358|Tom Clancy's Rainbow Six® Lockdown
+635|Tom Clancy's Rainbow Six® Siege
+1842|Tom Clancy's Rainbow Six® Siege (Rus)
+1843|Tom Clancy's Rainbow Six® Siege (Steam)
+1844|Tom Clancy's Rainbow Six® Siege (Steam, (Rus)/CIS)
+4865|Tom Clancy's Rainbow Six® Siege Test Server
+10424|Tom Clancy's Rainbow Six® Siege Test Server (Steam)
+88|Tom Clancy's Rainbow Six® Vegas
+108|Tom Clancy's Rainbow Six® Vegas 2
+109|Tom Clancy's Splinter Cell
+91|Tom Clancy's Splinter Cell Blacklist
+449|Tom Clancy's Splinter Cell Blacklist (Steam)
+95|Tom Clancy's Splinter Cell Chaos Theory™
+2|Tom Clancy's Splinter Cell Conviction
+110|Tom Clancy's Splinter Cell Double Agent
+5159|Tom Clancy's The Division 2 - PPS
+2036|Tom Clancy's The Division (Beta)
+3502|Tom Clancy's The Division PTS
+4932|Tom Clancy's The Division® 2
+568|Tom Clancy's The Division™
+1835|Tom Clancy's The Division™ (Rus)
+260|Tomb Raider
+261|Tomb Raider: Survival Edition
+5595|Trackmania
+127|Trackmania Canyon
+275|Trackmania Stadium
+2070|Trackmania Turbo
+10871|Transference
+5|Trial Rising (Demo)
+78|Trials Evolution Gold Edition
+262|Trials Evolution Gold Edition
+140|Trials Evolution Gold Edition MP (Beta)
+78|Trials Evolution: Gold Edition
+297|Trials Fusion
+318|Trials Fusion (Steam)
+834|Trials Fusion (Demo) (Steam)
+1275|Trials Fusion Multiplayer (Beta)
+3301|Trials of the Blood Dragon (Steam)
+3600|Trials Rising
+3601|Trials Rising
+5233|Trials Rising - (Open Beta)
+5454|Trials® Rising (Demo)
+3352|UNO (Uplay)
+3360|UNO (Uplay+Steam)
+17942|UNO - 50th Anniversary Theme Cards
+60710|UNO - AC Valhalla Theme Cards
+17860|UNO - Fenyx's Quest Theme Cards
+16383|UNO - Flip Theme Cards
+3766|UNO - Just Dance Theme Cards
+3765|UNO - Rayman Theme Cards
+59689|UNO - The Call of Yara Theme Cards
+3776|UNO - Winter Theme Cards
+3361|UNO (Demo)
+661|Valiant Hearts (Steam)
+659|Valiant Hearts (Uplay)
+9662|Valiant Hearts: Coming Home
+304|Victoria II
+133|War of the Roses
+200|Wargame: European Escalation
+305|Warlock: Master of the Arcane
+3053|Warlords Battlecry
+3054|Warlords Battlecry 2
+545|Watch Dogs (Asia)
+828|Watch Dogs (Asia) (Steam)
+3353|Watch Dogs: Legion
+7017|Watch Dogs: Legion (Steam)
+274|Watch_Dogs
+543|Watch_Dogs (Rus)
+541|Watch_Dogs (Steam)
+741|Watch_Dogs (Steam)
+1428|Watch_Dogs Complete Edition
+2688|WATCH_DOGS® 2
+3619|WATCH_DOGS® 2 (Steam)
+69|World In Conflict
+90|World In Conflict
+15657|XDefiant (Closed Beta)
+340|Zeit2
+1653|ZOMBI (Uplay)
+1832|Zombi (Uplay+Steam)
