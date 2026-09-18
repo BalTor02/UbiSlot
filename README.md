@@ -38,7 +38,15 @@ The application scans Ubisoft's local achievement data, identifies installed gam
 ---
 
 ## Installation
-1. Download the latest UbiSlot.zip (64 bit) from the [Releases](https://github.com/BalTor02/UbiSlot/releases/tag/V.0.1.0) page.
+
+**Beta version available:** UbiSlot `v0.2.0_beta` is currently available as a pre-release.
+
+The beta introduces a new Ubisoft game-session architecture and other changes that are not covered by this README.
+If you are testing the beta, please read the `README.txt` included inside the beta ZIP before using it.
+
+> [Download UbiSlot v0.2.0-beta](https://github.com/BalTor02/UbiSlot/releases)
+
+1. Download the stable UbiSlot.zip (64 bit) from the [Releases](https://github.com/BalTor02/UbiSlot/releases/tag/V.0.1.0) page.
 2. Extract the ZIP file to a location of your choice.
 3. Run UbiSlot.exe.
 4. Make sure Ubisoft Connect is installed and that your Ubisoft achievement data is available locally.
