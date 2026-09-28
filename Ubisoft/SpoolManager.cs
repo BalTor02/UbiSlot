@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
 using UbiSlot.Core;
 
 namespace UbiSlot.Ubisoft;
@@ -20,24 +23,142 @@ public class SpoolManager
             "spool");
     }
 
-    public List<string> FindSpoolFiles()
+    public string GetUserSpoolDirectory()
     {
         string spoolRoot =
             GetSpoolRoot();
 
-        if (!Directory.Exists(spoolRoot))
+        string ubisoftLauncherDirectory =
+            Directory
+                .GetParent(
+                    spoolRoot)!
+                .FullName;
+
+        string ownershipDirectory =
+            Path.Combine(
+                ubisoftLauncherDirectory,
+                "cache",
+                "ownership");
+
+        if (Directory.Exists(
+                ownershipDirectory))
+        {
+            try
+            {
+                IEnumerable<string> ownershipFiles =
+                    Directory.EnumerateFiles(
+                        ownershipDirectory,
+                        "*",
+                        SearchOption.TopDirectoryOnly);
+
+                foreach (string file in ownershipFiles)
+                {
+                    string fileName =
+                        Path.GetFileName(
+                            file);
+
+                    if (!Guid.TryParse(
+                            fileName,
+                            out Guid userId))
+                    {
+                        continue;
+                    }
+
+                    string userSpoolDirectory =
+                        Path.Combine(
+                            spoolRoot,
+                            userId.ToString());
+
+                    return userSpoolDirectory;
+                }
+            }
+            catch
+            {
+                // Fall through to the existing spool directories.
+            }
+        }
+
+        if (Directory.Exists(
+                spoolRoot))
+        {
+            try
+            {
+                string? existingUserDirectory =
+                    Directory.EnumerateDirectories(
+                        spoolRoot,
+                        "*",
+                        SearchOption.TopDirectoryOnly)
+                    .Where(
+                        directory =>
+                            Guid.TryParse(
+                                Path.GetFileName(
+                                    directory),
+                                out _))
+                    .OrderByDescending(
+                        directory =>
+                            GetDirectoryLastWriteTimeUtc(
+                                directory))
+                    .FirstOrDefault();
+
+                if (!string.IsNullOrWhiteSpace(
+                        existingUserDirectory))
+                {
+                    return existingUserDirectory;
+                }
+            }
+            catch
+            {
+                // Continue
+            }
+        }
+
+        throw new DirectoryNotFoundException(
+            "Ubisoft's per-user spool directory could not be identified.");
+    }
+
+    private static DateTime GetDirectoryLastWriteTimeUtc(
+        string directory)
+    {
+        try
+        {
+            return Directory
+                .GetLastWriteTimeUtc(
+                    directory);
+        }
+        catch
+        {
+            return DateTime.MinValue;
+        }
+    }
+
+    public List<string> FindSpoolFiles()
+    {
+        string userSpoolDirectory =
+            GetUserSpoolDirectory();
+
+        if (!Directory.Exists(
+                userSpoolDirectory))
         {
             return [];
         }
 
+        string spoolRoot =
+            GetSpoolRoot();
+
+        string ubisoftLauncherDirectory =
+            Directory
+                .GetParent(
+                    spoolRoot)!
+                .FullName;
+
         string backupRoot =
             Path.Combine(
-                Directory.GetParent(spoolRoot)!.FullName,
-                "UbiSlot_Backup");
+                ubisoftLauncherDirectory,
+                BackupFolderName);
 
         return Directory
             .GetFiles(
-                spoolRoot,
+                userSpoolDirectory,
                 "*.spool",
                 SearchOption.AllDirectories)
             .Where(
@@ -47,7 +168,8 @@ public class SpoolManager
                         StringComparison.OrdinalIgnoreCase))
             .GroupBy(
                 file =>
-                    Path.GetFileNameWithoutExtension(file),
+                    Path.GetFileNameWithoutExtension(
+                        file),
                 StringComparer.OrdinalIgnoreCase)
             .Select(
                 group =>

@@ -1,0 +1,340 @@
+﻿<Window x:Class="UbiSlot.SupportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Support"
+        Width="500"
+        Height="560"
+        MinWidth="500"
+        MinHeight="560"
+        MaxWidth="500"
+        MaxHeight="560"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource PrimaryText}"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+
+        <!-- COLORS                                                  -->
+
+        <SolidColorBrush x:Key="WindowBackground"
+                         Color="#101014"/>
+
+        <SolidColorBrush x:Key="PanelBackground"
+                         Color="#15151A"/>
+
+        <SolidColorBrush x:Key="FieldBackground"
+                         Color="#24242C"/>
+
+        <SolidColorBrush x:Key="HoverBackground"
+                         Color="#34343D"/>
+
+        <SolidColorBrush x:Key="BorderColor"
+                         Color="#332A3D"/>
+
+        <SolidColorBrush x:Key="AccentColor"
+                         Color="#3D1B5D"/>
+
+        <SolidColorBrush x:Key="AccentHoverColor"
+                         Color="#512878"/>
+
+        <SolidColorBrush x:Key="PrimaryText"
+                         Color="#F2F2F5"/>
+
+        <SolidColorBrush x:Key="SecondaryText"
+                         Color="#9A93A3"/>
+
+        <SolidColorBrush x:Key="MutedText"
+                         Color="#7A7482"/>
+
+        <!-- HEADER / FOOTER                                         -->
+
+        <LinearGradientBrush x:Key="HeaderFooterGradient"
+                             StartPoint="0,0"
+                             EndPoint="1,0">
+
+            <GradientStop Color="#1B1420"
+                          Offset="0"/>
+
+            <GradientStop Color="#241A2E"
+                          Offset="0.5"/>
+
+            <GradientStop Color="#1B1420"
+                          Offset="1"/>
+
+        </LinearGradientBrush>
+
+        <Style x:Key="SecondaryButtonStyle"
+               TargetType="{x:Type Button}">
+
+            <Setter Property="Height"
+                    Value="34"/>
+
+            <Setter Property="Padding"
+                    Value="16,0"/>
+
+            <Setter Property="Background"
+                    Value="{DynamicResource FieldBackground}"/>
+
+            <Setter Property="Foreground"
+                    Value="{DynamicResource PrimaryText}"/>
+
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource BorderColor}"/>
+
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+
+            <Setter Property="FontSize"
+                    Value="12"/>
+
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+
+            <Setter Property="Focusable"
+                    Value="False"/>
+
+            <Setter Property="Template">
+
+                <Setter.Value>
+
+                    <ControlTemplate TargetType="{x:Type Button}">
+
+                        <Border x:Name="ButtonBackground"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+
+                            <ContentPresenter
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+
+                                <Setter TargetName="ButtonBackground"
+                                        Property="Background"
+                                        Value="{DynamicResource HoverBackground}"/>
+
+                                <Setter TargetName="ButtonBackground"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentHoverColor}"/>
+
+                            </Trigger>
+
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+
+                                <Setter TargetName="ButtonBackground"
+                                        Property="Background"
+                                        Value="#1C1C22"/>
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+
+            </Setter>
+
+        </Style>
+
+        <!-- GITHUB BUTTON                                           -->
+
+        <Style x:Key="GitHubButtonStyle"
+               TargetType="{x:Type Button}"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
+
+            <Setter Property="Height"
+                    Value="42"/>
+
+            <Setter Property="Padding"
+                    Value="16,0"/>
+
+        </Style>
+
+    </Window.Resources>
+
+
+    <Grid Background="{DynamicResource WindowBackground}">
+
+        <Grid.RowDefinitions>
+
+            <RowDefinition Height="82"/>
+
+            <RowDefinition Height="*"/>
+
+            <RowDefinition Height="64"/>
+
+        </Grid.RowDefinitions>
+
+        <!-- HEADER                                                  -->
+
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderFooterGradient}"
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="0,0,0,1"
+                Panel.ZIndex="2">
+
+            <Grid Margin="28,0">
+
+                <StackPanel VerticalAlignment="Center">
+
+                    <TextBlock Text="Support"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Foreground="White"/>
+
+                    <TextBlock Text="Support the development of UbiSlot"
+                               Margin="0,4,0,0"
+                               FontSize="11"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource SecondaryText}"/>
+
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Disabled"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="28,24">
+
+            <StackPanel>
+
+                <TextBlock Text="CREDITS"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SecondaryText}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,12"/>
+
+
+                <Border Background="{DynamicResource PanelBackground}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="9"
+                        Padding="18">
+
+                    <StackPanel>
+
+                        <TextBlock Text="BalTor"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource PrimaryText}"/>
+
+                        <TextBlock Text="UbiSlot Developer"
+                                   Margin="0,4,0,16"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource MutedText}"/>
+
+
+                        <TextBlock Text="NikitaGareev"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource PrimaryText}"/>
+
+                        <TextBlock Text="Uplay Game ID"
+                                   Margin="0,4,0,16"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource MutedText}"/>
+
+
+                        <TextBlock Text="PSerban93"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource PrimaryText}"/>
+
+                        <TextBlock Text="Ubisoft achievement data extraction technique"
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource MutedText}"
+                                   TextWrapping="Wrap"/>
+
+                    </StackPanel>
+
+                </Border>
+
+
+                <TextBlock Text="UbiSlot is an independent, community-developed tool and is not affiliated with or endorsed by Ubisoft Entertainment. Use it at your own discretion. UbiSlot modifies local Ubisoft achievement data and does not guarantee synchronization or account behavior."
+                           Margin="0,14,0,0"
+                           FontSize="9"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource SecondaryText}"
+                           TextWrapping="Wrap"/>
+
+            </StackPanel>
+
+        </ScrollViewer>
+
+        <!-- FOOTER                                                  -->
+
+        <Border Grid.Row="2"
+                Background="{StaticResource HeaderFooterGradient}"
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="0,1,0,0"
+                Panel.ZIndex="2">
+
+            <Grid Margin="28,0">
+
+                <Button x:Name="GitHubSponsorsButton"
+                        Width="190"
+                        Height="40"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Click="GitHubSponsorsButton_Click"
+                        Style="{StaticResource GitHubButtonStyle}">
+
+                    <StackPanel Orientation="Horizontal">
+
+                        <Viewbox Width="20"
+                                 Height="20"
+                                 Margin="0,0,9,0">
+
+                            <Canvas Width="24"
+                                    Height="24">
+
+                                <Path Fill="White"
+                                      Data="M12,2C6.48,2 2,6.48 2,12C2,16.42 4.87,20.17 8.84,21.49C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.49,20.14 9.49,19.31C6.73,19.91 6.14,17.98 6.14,17.98C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.89 5.1,15.89C6.1,15.96 6.63,16.92 6.63,16.92C7.52,18.45 8.97,18.01 9.52,17.76C9.61,17.11 9.87,16.67 10.15,16.42C7.95,16.17 5.64,15.32 5.64,11.07C5.64,9.86 6.07,8.87 6.77,8.09C6.66,7.84 6.26,6.72 6.87,5.2C6.87,5.2 7.78,4.91 9.47,6.05C10.34,5.81 11.26,5.69 12.18,5.69C13.1,5.69 14.02,5.81 14.89,6.05C16.58,4.91 17.49,5.2 17.49,5.2C18.1,6.72 17.7,7.84 17.59,8.09C18.29,8.87 18.72,9.86 18.72,11.07C18.72,15.33 16.41,16.16 14.2,16.41C14.55,16.71 14.86,17.3 14.86,18.2C14.86,19.49 14.85,20.53 14.85,21C14.85,21.27 15.01,21.58 15.51,21.49C19.48,20.17 22.35,16.42 22.35,12C22.35,6.48 17.87,2 12.35,2H12Z"/>
+
+                            </Canvas>
+
+                        </Viewbox>
+
+                        <TextBlock Text="Support me on GitHub"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+
+                    </StackPanel>
+
+                </Button>
+
+            </Grid>
+
+        </Border>
+
+    </Grid>
+
+</Window>

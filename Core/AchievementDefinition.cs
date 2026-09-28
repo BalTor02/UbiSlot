@@ -1,4 +1,5 @@
-﻿namespace UbiSlot.Core;
+﻿using System;
+namespace UbiSlot.Core;
 
 public class AchievementDefinition
 {
