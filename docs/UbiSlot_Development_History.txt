@@ -1,0 +1,1157 @@
+UBISLOT DEVELOPMENT HISTORY
+
+Project: UbiSlot
+Description: Ubisoft achievement unlocker and management tool for Windows
+Developer: BalTor02
+Repository: https://github.com/BalTor02/UbiSlot
+Current release: v0.3.0-beta
+
+ABOUT THIS DOCUMENT
+
+This is the development history of UbiSlot. It records how the project started, what I investigated, what broke, what worked, and which ideas I eventually dropped.
+
+This is not meant to be a user manual. The README covers installation and normal usage. This document is here so the technical work behind UbiSlot is not lost, especially the reverse-engineering, debugging, and experiments that led to the final architecture.
+
+Some of the things documented here are no longer part of UbiSlot. I am keeping them because they were part of the actual development process and, in several cases, helped explain why the final product ended up the way it did.
+
+HOW UBISLOT STARTED
+
+UbiSlot was not a project I had planned months in advance. It came from the same game reverse-engineering and modding work I had already been doing.
+
+Before UbiSlot, I had been using UE4SS, UE4SS Live Viewer, Cheat Engine, FModel, runtime object inspection, and other tools to understand how games worked internally. A lot of that work was simply following things until they made sense: finding hidden objects, checking properties, tracing game logic, changing values at runtime, and testing what happened.
+
+One earlier project involved a broken ending in a game. I managed to locate the missing animation or cutscene and trigger it through a live UE4SS instance. After that I created manual saves for the different endings so other players could load the saves and legitimately trigger the corresponding ending and achievement. Those saves were published on GitHub.
+
+I later reverse-engineered another indie game. A few days after that, the idea for UbiSlot came almost out of nowhere:
+
+"I have a best idea, why don't we make a Ubisoft achievement unlocking tool?"
+
+That was the starting point.
+
+The original idea was pretty simple. Ubisoft games keep useful achievement information locally, but there was no convenient way for me to inspect and manage it the way I wanted. I wanted a small Windows tool that could read that local information, show it in a proper interface, and make achievement management less tedious.
+
+I also wanted to build something around Ubisoft games because I genuinely like series such as Assassin's Creed, Watch_Dogs, Far Cry, and Prince of Persia.
+
+THE FIRST DEVELOPMENT PUSH
+
+The first serious UbiSlot development phase took roughly two focused days.
+
+At that point I did not have professional software-development experience. Most of the work was therefore very iterative. I would try something, build it, run it, look at the logs, inspect the files or processes involved, figure out what I misunderstood, and change the implementation.
+
+That process eventually turned the idea into a real Windows application instead of just another reverse-engineering experiment.
+
+The progression was roughly:
+
+Game modding
+UE4SS and runtime inspection
+Reverse-engineering game logic
+Fixing a broken game ending
+Creating useful saves for other players
+More game reverse engineering
+The idea for a Ubisoft achievement tool
+UbiSlot
+A few days of development and debugging
+A working Windows executable
+GitHub release
+
+THE ORIGINAL GOAL
+
+The original product was never meant to become a giant game launcher.
+
+The goal was to work with Ubisoft's own locally stored data and build a focused achievement manager around it.
+
+The basic idea was:
+
+Local Ubisoft data
+→ identify the Ubisoft Game ID
+→ resolve the game name
+→ locate the achievement archive and local achievement state
+→ read achievement definitions
+→ display them
+→ let the user select achievements
+→ modify the appropriate local achievement data
+
+The project later gained backups, session handling, searching, sorting, game covers, themes, settings, and custom dialogues, but the main idea stayed the same.
+
+EARLY UBISOFT DATA DISCOVERY
+
+One of the first real challenges was finding out where Ubisoft Connect actually keeps the information UbiSlot needs.
+
+The important local locations turned out to be the Ubisoft Game Launcher ownership cache, the achievement cache, and the spool directory.
+
+The achievement archives are stored under:
+
+C:\ProgramData\Ubisoft\Ubisoft Game Launcher\cache\achievements
+
+These archives use a Game ID-based naming pattern. Assassin's Creed Rogue, for example, uses Ubisoft Game ID 1662 and an archive named:
+
+1662_cb5ef28385ea701caab1bde1499d5da8
+
+Inside the archive is an en-US_loc.txt file containing achievement IDs, names, and descriptions.
+
+The spool data was more interesting. I initially assumed a spool file could simply be found directly under the Ubisoft spool root. That assumption turned out to be wrong.
+
+The current user's spool files are stored under a user-specific GUID directory. Finding that mattered because the earlier implementation could target a path that looked like:
+
+Ubisoft Game Launcher\spool\1843.spool
+
+even though the real file belonged under the user's GUID directory.
+
+That became one of the more important bugs to fix.
+
+GAME DATABASE AND OWNERSHIP DETECTION
+
+UbiSlot uses a bundled game database called UplayGames.txt.
+
+Its format is intentionally simple:
+
+GameID|Game Name
+
+GameDatabase loads that file from the application's Games directory and provides name lookup.
+
+OwnershipManager has a different job. It scans Ubisoft's local ownership cache, extracts candidate numeric IDs, and checks them against the game database.
+
+The two jobs stay separate on purpose.
+
+Ownership detection answers:
+"Which Ubisoft Game IDs are present for this user?"
+
+The game database answers:
+"What game does this ID represent?"
+
+That separation kept the rest of the application much easier to reason about.
+
+THE ACHIEVEMENT CACHE
+
+AchievementCache is responsible for finding and reading the achievement archive for a game.
+
+The archive is treated as a ZIP file. UbiSlot looks for en-US_loc.txt and reads the tab-separated fields containing the achievement ID, name, and description.
+
+The UI works with an AchievementDefinition object containing:
+
+AchievementId
+Name
+Description
+IconPath
+IsUnlocked
+UnlockTimeUtc
+
+Achievement icons are extracted from the archive and cached locally under UbiSlot_Cache.
+
+The static achievement definitions and the current local unlock state come from two different places. The archive tells UbiSlot what achievements exist. The spool records tell it which ones are currently unlocked and provide the local timestamp.
+
+That became the bridge between the game's static achievement data and the user's actual state.
+
+THE SPOOL INVESTIGATION
+
+The spool became one of the most important parts of UbiSlot.
+
+SpoolManager handles locating spool files, parsing records, creating records, writing modified data, and handling backups and restoration.
+
+A SpoolRecord currently keeps:
+
+AchievementId
+UnlockTimestamp
+RawBytes
+UnlockTimeUtc
+
+Keeping RawBytes was useful because the actual record format contains information that the application does not need to reinterpret just to preserve it.
+
+I also wanted backup and restore to be part of the design from the beginning of serious achievement modification.
+
+There are two different forms of backup in the final architecture.
+
+The first is the permanent UbiSlot safety backup.
+
+The second is the original session state captured when AchievementWindow opens.
+
+The permanent backup is there as a recovery point. The session copy is what powers the Restore Original button.
+
+THE WRONG SPOOL PATH BUG
+
+The per-user spool discovery problem was one of the first bugs that made it clear that guessing paths was not good enough.
+
+Once I compared the ownership cache with the actual spool directories, I found that a GUID-named ownership file could be used to identify the current user's spool directory.
+
+The fix was GetUserSpoolDirectory().
+
+It checks the ownership directory for a GUID-named file, derives the matching spool directory, and uses that location. There is also a fallback that looks for an existing GUID-named spool directory if ownership information cannot be used directly.
+
+This changed UbiSlot from "looking somewhere that seems plausible" to using the same per-user location that Ubisoft actually uses.
+
+UBISOFT CONNECT SDK INVESTIGATION
+
+Another major part of the project was the old Ubisoft SDK used by these games.
+
+The relevant DLL is:
+
+uplay_r164.dll
+
+On a normal installed Ubisoft Connect system it is located under:
+
+C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\uplay_r164.dll
+
+During the investigation I confirmed exports including:
+
+UPLAY_Init
+UPLAY_Startup
+UPLAY_Start
+UPLAY_Quit
+UPLAY_Release
+UPLAY_ACH_GetAchievements
+UPLAY_ACH_EarnAchievement
+UPLAY_ACH_Write
+UPLAY_USER_IsConnected
+UPLAY_USER_IsOwned
+UPLAY_USER_GetTicketUtf8
+UPLAY_USER_GetAccountIdUtf8
+
+There was an early bundled-DLL approach, but I later moved the implementation toward loading the installed Ubisoft DLL.
+
+There was also a path bug where UbiSlot was still looking for the DLL under an old bin\Debug path. That was corrected.
+
+UPLAY STARTUP BEHAVIOR
+
+UPLAY_Startup was tested in different contexts.
+
+I saw it return 0 in some cases and 2 in another process context. Neither result was treated as an automatic failure because the surrounding Ubisoft-managed session behavior showed that Ubisoft Connect could still continue the expected startup sequence.
+
+A successful example for Rogue was:
+
+UPLAY_Startup(1662) returned: 0
+
+That taught me not to interpret legacy API return values in isolation. The runtime behavior around the call matters too.
+
+THE UBISOFT-MANAGED SESSION DISCOVERY
+
+One of the biggest architectural discoveries came from watching the actual Ubisoft process chain.
+
+The working pattern eventually looked like this:
+
+Normal UbiSlot.exe
+→ user selects a Ubisoft game
+→ UbiSlot.exe with the Game ID
+→ Ubisoft session startup
+→ Ubisoft Connect manages the session
+→ Ubisoft Connect starts another UbiSlot.exe instance
+→ AchievementWindow
+
+The second UbiSlot process has UbisoftGameLauncher.exe as its parent process.
+
+That matters because it lets App.xaml.cs distinguish three cases:
+
+1. Normal application instance
+2. Bootstrap instance started with a numeric Game ID
+3. Ubisoft-managed instance whose parent process is UbisoftGameLauncher
+
+The managed instance does not start another Ubisoft session. It simply opens AchievementWindow and attaches to the already-managed session.
+
+This separation ended up being much more reliable than trying to make the AchievementWindow create or fake its own session.
+
+PROCESS DETECTION AND SESSION SAFETY
+
+App.xaml.cs records the current process ID and command-line arguments, obtains the parent process ID, checks the parent process name, and selects the correct startup mode.
+
+If the parent process is UbisoftGameLauncher, the process is treated as the managed instance.
+
+If the process has a numeric first argument and the parent is not UbisoftGameLauncher, it is treated as the bootstrap instance.
+
+Otherwise it is the normal application instance and opens MainWindow.
+
+The launch layer also checks whether another Ubisoft game is already running.
+
+The intended behavior is:
+
+No Ubisoft game running:
+Start the selected game's session.
+
+The selected game is already running:
+Use the existing legitimate Ubisoft session instead of starting another one.
+
+A different Ubisoft game is already running:
+Refuse the operation until the other game is closed.
+
+This was important because I did not want UbiSlot interfering with a completely different running Ubisoft game.
+
+THE ACHIEVEMENT WINDOW
+
+AchievementWindow became the main interface for the active game session.
+
+When it opens, it verifies the Game ID, resolves the game name, checks that the expected Ubisoft game is actually running, locates the spool file, captures the original state, and loads the achievement data.
+
+It also handles games that do not have a spool yet.
+
+In that situation the achievement list can still be built from the achievement archive. If a new spool is needed, UbiSlot uses the actual per-user spool directory instead of creating a file at the wrong level.
+
+A later design change made achievement writes happen immediately.
+
+Originally the idea was to wait until the window closed and write everything at the end. That turned out to be a poor fit for the process lifecycle. Immediate writing is much easier to reason about because the change happens while the process is definitely alive, and the user can use Restore Original during that session.
+
+SEARCH AND SORTING
+
+The achievement list eventually became more than a plain list.
+
+Search filters in real time using the achievement name or Achievement ID.
+
+Sorting was added for:
+
+Name
+ID
+Date Achieved
+Locked
+Unlocked
+
+Date Achieved is specifically ordered from oldest to newest. Locked achievements do not have an achievement timestamp, so they stay at the end of that ordering.
+
+There is also Select All Locked. When all currently locked achievements are selected, the same button changes to Deselect All.
+
+CUSTOM DIALOGUES
+
+The application originally used standard WPF message boxes.
+
+I later replaced the achievement-related confirmation, information, and error dialogs with a reusable custom Dialogue window so they use the same visual language as the rest of UbiSlot.
+
+Dialogue supports:
+
+Warning
+Information
+Error
+
+There was a bug in the confirmation flow where the result could be reset during closing. The fix was to set Confirmed and DialogResult directly in the button handlers and let ShowDialog() handle the closing behavior instead of separately calling Close().
+
+That gave AchievementWindow a reliable reusable dialogue system.
+
+THE UI
+
+The UI gradually became a proper Windows desktop interface instead of looking like a technical utility.
+
+The visual style settled around dark backgrounds with a violet accent near #3D1B5D.
+
+The final interface includes:
+
+Dark and light themes
+Rounded controls
+Achievement cards
+Custom scrollbars
+Animated search interaction
+Responsive controls
+Game cover presentation
+Completion counters
+Pinned games
+Settings
+Support window
+Custom dialogue windows
+
+The goal was always to keep the application technically useful while still making it feel like an actual finished tool.
+
+GAME COVERS
+
+Game covers were added as a visual feature.
+
+GameCoverService uses a public Steam Store search to find a matching game and then retrieves compatible artwork from Steam CDN URLs.
+
+The downloaded cover is cached locally under:
+
+UbiSlot_Cache\Covers
+
+Steam is not used for Ubisoft achievement data or Ubisoft ownership in the final Ubisoft-focused product. In this context it is only an artwork source.
+
+MAIN WINDOW AND LIBRARY
+
+MainWindow became the library view.
+
+It scans Ubisoft ownership data, checks local spool information where available, loads the game database, and loads cover artwork progressively.
+
+The library supports:
+
+Game search
+Game counts
+Completion information
+Pinned games
+Cover artwork
+
+Cover loading was intentionally made asynchronous so the library could appear before every cover finished downloading. I did not want one slow network request to block the entire library.
+
+AUTOMATIC REFRESH PROBLEM
+
+One architectural problem took longer to solve than expected: refreshing MainWindow after AchievementWindow finishes.
+
+The two windows are not necessarily in the same process.
+
+MainWindow starts a bootstrap UbiSlot process. That bootstrap process exits after starting the Ubisoft session. Ubisoft Connect then starts the managed UbiSlot process containing AchievementWindow.
+
+Because of that, MainWindow cannot simply wait for the bootstrap process to exit and assume the game session has ended.
+
+A cross-process named event was explored as a way for AchievementWindow to signal MainWindow when the work was complete.
+
+The first refresh test failed.
+
+So that design was not treated as proven just because it looked good on paper.
+
+This became a recurring lesson during UbiSlot development: if a synchronization mechanism only makes sense theoretically but has not survived a real process-lifecycle test, it is not finished.
+
+BACKUP AND RESTORE
+
+Achievement modification is persistent data modification, so backup behavior became a core part of the design.
+
+UbiSlot keeps permanent safety backups independently of the user-configurable backup location.
+
+The Settings window can change where UbiSlot's backups are stored.
+
+When AchievementWindow opens, it captures the exact original spool state.
+
+If Restore Original is used, that original state is written back.
+
+If there was no original spool and UbiSlot created one during the session, restore removes the UbiSlot-created spool instead of pretending that a file existed originally.
+
+One important limitation is shown directly to the user: restoring the local data cannot undo an achievement that has already synchronized elsewhere.
+
+SETTINGS
+
+Settings were consolidated into UbiSlotSettings.
+
+The current settings include:
+
+Theme
+ShowGameName
+ShowCompletion
+HideZeroAchievementGames
+BackupPath
+AutoUpdateCheck
+LastUpdateCheckUtc
+
+Settings are stored under UbiSlot_Cache.
+
+The current release constant is:
+
+0.3.0-beta
+
+Automatic update checking uses the GitHub releases endpoint for the UbiSlot repository.
+
+A SMALL WPF THEME BUG
+
+There was a WPF resource problem when the application started changing theme colors dynamically.
+
+The issue was caused by trying to modify a brush that had become frozen.
+
+The fix was to replace the resource entry with a new SolidColorBrush instead of modifying the old frozen brush in place.
+
+It was a small bug, but it was a good example of why WPF resource behavior matters when building runtime theme switching.
+
+LAUNCH AND SESSION BUGS
+
+A lot of the difficult debugging came from the difference between starting a Ubisoft session and simply starting a game executable.
+
+The project eventually stopped trying to treat the game executable like a normal child process and moved to the Ubisoft-managed session architecture.
+
+That let Ubisoft Connect keep ownership of the actual session context.
+
+It also established another important rule: once Ubisoft Connect has created the managed UbiSlot instance, AchievementWindow must not call UPLAY_Startup again.
+
+THE UBISOFT CONNECT INJECTOR IDEA
+
+At one stage I considered a much more ambitious approach: injecting UbiSlot functionality directly into Ubisoft Connect so a user could open the Ubisoft Connect overlay and access UbiSlot from there.
+
+The idea was to inject code into Ubisoft Connect while keeping the normal launcher behavior intact.
+
+The problem was not that it was impossible in principle. The amount of work required to make it reliable, preserve the existing Ubisoft Connect architecture, and stay within platform restrictions made it a bad direction for this project.
+
+I dropped the idea.
+
+UbiSlot remains a standalone executable.
+
+THE BROADER PLATFORM SYNCHRONIZATION IDEA
+
+At one point the project was going to become much broader.
+
+The plan was to have Ubisoft first and then add achievement synchronization for Steam, Epic, and GOG. The idea was to map an achievement from the Ubisoft side and then synchronize it through a platform-specific layer.
+
+The rough concept was:
+
+Ubisoft local achievement state
+→ achievement mapping
+→ platform-specific synchronization
+→ target platform achievement state
+
+That turned into a research project of its own.
+
+The Steam side in particular became much more complicated than the original UbiSlot idea because different games use different Steam API generations and different synchronization paths.
+
+Eventually I dropped the broader platform synchronization work from the product.
+
+UbiSlot is now intentionally Ubisoft-only.
+
+THE ASSASSIN'S CREED ROGUE TEST
+
+Assassin's Creed Rogue became the main real-world test case for the Steam investigation because it has Ubisoft achievements and a Steam release.
+
+The tested configuration was:
+
+Ubisoft Game ID: 1662
+Game: Assassin's Creed Rogue (Asia) (Steam)
+Steam AppID: 311560
+Ubisoft achievements: 46
+Steam achievements: 46
+
+The main pending test achievement was:
+
+Ubisoft achievement ID: 40
+Name: Instant Vikings
+Steam API name: ACRogue_Ach_40
+
+The useful test condition was that Instant Vikings was unlocked on Ubisoft but still locked on Steam.
+
+That gave me a genuine pending synchronization target instead of testing an achievement that was already unlocked everywhere.
+
+THE FIRST STEAM API APPROACH
+
+The first Steam implementation loaded the Steam client DLL directly and used Steam client and ISteamUserStats interfaces.
+
+That part worked surprisingly well for reading.
+
+The test successfully demonstrated:
+
+Steam client connection
+Steam user availability
+SteamID retrieval
+Stats interface creation
+Stats requests
+Callback processing
+Achievement enumeration
+Achievement state reading
+
+Rogue reported all 46 achievements successfully.
+
+The problem was writing an achievement.
+
+STEAM APPID RESOLUTION
+
+The experimental Steam code used a public Steam Store search to resolve a Steam AppID from the Ubisoft game name.
+
+Rogue's Ubisoft-side name was:
+
+Assassin's Creed Rogue (Asia) (Steam)
+
+The cleaned search name became:
+
+Assassin's Creed Rogue
+
+Steam returned the correct result:
+
+Assassin's Creed Rogue
+AppID 311560
+
+Additional content such as the Templar Legacy Pack and Time Saver packs was correctly ignored.
+
+So the AppID search itself was not the reason the write path failed.
+
+A separate bug did show up in the experimental name matching.
+
+The correct Steam result could be returned but then rejected later because the candidate ended up with a score of zero. The displayed game names differed by things such as trademark symbols and punctuation.
+
+I also caught a bad assumption in the source: a method called NormalizeForComparison had been mentioned in a previous development attempt, but it did not actually exist in the relevant SteamAppIdService source.
+
+The real NormalizeGameName method belonged to MainWindow and was not the same thing.
+
+That was a useful reminder to always go back to the actual source before debugging a method by name.
+
+STEAM INITIALIZATION WAS WORKING
+
+The Steam side produced solid evidence that initialization itself was not the problem.
+
+The tests showed that:
+
+SteamAPI_InitSafe succeeded.
+A Steam user was available.
+A valid SteamID could be obtained.
+Current stats could be requested.
+The UserStatsReceived callback arrived.
+Rogue reported 46 achievements.
+GetAchievement worked for the target.
+The target correctly reported as locked.
+
+So the problem was much more specific than "Steam isn't working."
+
+THE USERSTATS CALLBACK BUG
+
+While working on the Steam side I found a callback structure parsing bug.
+
+The UserStatsReceived_t structure was determined to contain:
+
+GameID at offset 0
+Result at offset 8
+SteamID at offset 12
+
+with a minimum size of 20 bytes.
+
+Correcting those offsets fixed callback parsing.
+
+The callback then reported Rogue's Steam AppID correctly. The observed callback GameID was 0x4C108, which is 311560 in decimal.
+
+That confirmed the callback and AppID were consistent.
+
+SETACHIEVEMENT FAILED
+
+The most important Steam result was that SetAchievement returned false even though everything around it looked healthy.
+
+For the pending target:
+
+GetAchievement("ACRogue_Ach_40")
+→ true
+
+Achieved
+→ false
+
+Then:
+
+SetAchievement("ACRogue_Ach_40")
+→ false
+
+This happened repeatedly.
+
+The same behavior happened for achievements that were already unlocked on Steam, although those were not useful write tests because the final state was already true.
+
+I later removed a safety gate for controlled diagnostics and repeated the write attempts. SetAchievement still returned false.
+
+So the original safety gate was not the reason.
+
+STORESTATS DID NOT SOLVE IT
+
+Once the write gate was removed for testing, StoreStats was allowed to run.
+
+StoreStats returned true even when SetAchievement returned false.
+
+That distinction mattered.
+
+A successful StoreStats call does not mean an achievement was unlocked. In this case SetAchievement had not changed the local state in the first place, so there was nothing useful for StoreStats to commit.
+
+The result was effectively:
+
+SetAchievement successes: 0 out of 18
+StoreStats: true
+Successful local achievement sets: 0
+
+That ruled out StoreStats as the missing magic call.
+
+THE STEAM APPID FILE EXPERIMENT
+
+I also tested a steam_appid.txt file containing the correct Rogue AppID.
+
+The environment was also tested with SteamAppId and SteamGameId set to 311560.
+
+That did not change the SetAchievement result.
+
+The callback was already confirming the correct AppID, so this experiment helped rule out simple AppID configuration as the main issue.
+
+THE ACTUAL ROGUE STEAM API DLL
+
+One of the most important distinctions during the investigation was keeping the real Rogue DLL separate from any UbiSlot copy.
+
+The actual Assassin's Creed Rogue game folder contained its own steam_api64.dll.
+
+That game copy was inspected independently.
+
+The old Rogue DLL contained legacy interface information including:
+
+STEAMUSERSTATS_INTERFACE_VERSION011
+SteamUser016
+SteamClient012
+
+It also exposed SteamUserStats and SteamClient related entry points.
+
+That mattered because the Steamworks SDK I was initially using was newer.
+
+The real Rogue game was not necessarily using the same interface path that a modern sample application would use.
+
+A valid ISteamUserStats object could be obtained through the ISteamClient interface using the legacy GetISteamUserStats path and the v011 interface.
+
+That was an important compatibility discovery, but it still did not make SetAchievement succeed.
+
+STEAMWORKS SDK COMPARISON
+
+Steamworks SDK 1.65 was downloaded and inspected during the investigation.
+
+The newer public interface is:
+
+STEAMUSERSTATS_INTERFACE_VERSION013
+
+The relevant ISteamUserStats method order included:
+
+GetStat(int)
+GetStat(float)
+SetStat(int)
+SetStat(float)
+UpdateAvgRateStat
+GetAchievement
+SetAchievement
+ClearAchievement
+GetAchievementAndUnlockTime
+StoreStats
+GetAchievementIcon
+GetAchievementDisplayAttribute
+IndicateAchievementProgress
+GetNumAchievements
+GetAchievementName
+
+The normal Steamworks pattern is to call SetAchievement and then StoreStats, while pumping callbacks and checking the resulting state.
+
+UbiSlot could reproduce that standard client-side sequence.
+
+The problem was that Rogue still rejected the achievement write.
+
+GETSTAT INVESTIGATION
+
+I also looked at stats because some games can make achievement behavior depend on internal stats or other state.
+
+The actual Rogue steam_api64.dll did not expose a flat SteamAPI_ISteamUserStats_GetStat export.
+
+The correct legacy approach was to reach GetStat through the ISteamUserStats vtable.
+
+I did not want to start inventing arbitrary stat names or changing random values just to see what happened.
+
+The intended diagnostic approach was to identify the real Rogue stats first and only use GetStat for observation.
+
+THE COMBINED UBISOFT + STEAM EXPERIMENT
+
+Another important experiment initialized both sides in the same logical session without launching the legitimate Rogue game executable.
+
+The sequence was:
+
+Ubisoft UPLAY_Startup
+→ SteamAPI_InitSafe
+→ request current Steam stats
+→ pump callbacks
+→ GetAchievement
+→ SetAchievement
+→ StoreStats
+→ pump callbacks
+→ final verification
+
+The result was still the same.
+
+The Ubisoft session was active.
+The Steam session was active.
+Stats were available.
+All 46 achievements were readable.
+The target was readable and locked.
+SetAchievement still returned false.
+
+So simply having authenticated Ubisoft and Steam sessions together did not reproduce the synchronization Rogue performs.
+
+LEGITIMATE ROGUE LAUNCH BEHAVIOR
+
+The most interesting observation came from launching Rogue normally.
+
+When an achievement was already unlocked on Ubisoft, a legitimate Rogue launch could cause the corresponding Steam achievement to synchronize automatically.
+
+The observed sequence was roughly:
+
+Ubisoft achievement already unlocked
+→ legitimate Rogue launch
+→ Ubisoft/Rogue/Steam synchronization
+→ Steam achievement becomes unlocked
+
+The external UbiSlot test was different:
+
+Authenticated Ubisoft session
++
+Authenticated Steam session
++
+same AppID
++
+Rogue steam_api64.dll
++
+readable achievements
+→ SetAchievement still returned false
+
+That difference strongly suggested that the game's own runtime path was doing something that a simple external Steam achievement API call did not reproduce.
+
+I never established the exact mechanism.
+
+WHAT WAS OBSERVED VS WHAT WAS ONLY A HYPOTHESIS
+
+The investigation produced a working hypothesis that Ubisoft or the game's authenticated session has an authoritative role in the Ubisoft-to-Steam synchronization path.
+
+That hypothesis was supported by the observed behavior, but the exact server-side credential, token, or authorization mechanism was never identified.
+
+The concrete facts were:
+
+A legitimate Rogue launch can synchronize an already-unlocked Ubisoft achievement to Steam.
+
+An external direct SetAchievement call returned false.
+
+Authenticated Ubisoft and Steam sessions in UbiSlot did not reproduce the same result.
+
+The exact synchronization mechanism remained unknown.
+
+That distinction matters. I did not want a theory from an experiment to quietly become a statement of fact in the final documentation.
+
+COMPARISON WITH GENERIC STEAM ACHIEVEMENT MANAGERS
+
+Steam Achievement Manager and similar tools use the normal Steam achievement path around SetAchievement and StoreStats.
+
+The Rogue tests showed that this ordinary path did not unlock the problematic Ubisoft-derived Steam achievement.
+
+That is why generic Steam achievement tools were not the answer to the specific Rogue problem I was investigating.
+
+I also looked at other achievement utilities and used them as references for Steam API behavior, callback handling, interface compatibility, and DLL loading concepts. They were useful for understanding the normal Steam side, but none reproduced Rogue's Ubisoft-driven synchronization behavior.
+
+COMPARING ROGUE WITH OTHER UBISOFT GAMES
+
+Assassin's Creed Rogue and Assassin's Creed Revelations were also inspected at the executable level.
+
+Both contained substantial Ubisoft accomplishment systems, including ideas such as accomplishment managers, monitors, events, conditions, Uplay mappings, and Uplay passport structures.
+
+Their platform integration was not identical.
+
+Rogue's ACC.exe is a 64-bit executable with explicit Steam-related references.
+
+Revelations' ACRSP.exe is a 32-bit executable using a different Ubisoft loader stack and did not show the same direct static Steam API integration.
+
+That suggested something important: Ubisoft games from different generations may use different synchronization mechanisms.
+
+Because of that, I did not want to force every Ubisoft game into one generic Steam SetAchievement implementation.
+
+THE MINIMAL RUNTIME IDEA
+
+During the Steam investigation another idea came up: eventually it would be useful to reproduce a legitimate game's synchronization path without requiring a user to install a huge game just to trigger it.
+
+For Rogue, that raised the question of whether ACC.exe plus the minimum required runtime components could run far enough to perform the game's normal synchronization.
+
+That stayed as an experimental research direction rather than becoming part of the released UbiSlot beta.
+
+WHY THE PLATFORM-SPECIFIC PROJECT WAS DROPPED
+
+The broader synchronization work grew far beyond the original UbiSlot idea.
+
+It involved questions about:
+
+Different Steam API generations
+Different Ubisoft game architectures
+Game-native versus launcher-native synchronization
+Server-side authorization
+Cross-platform account state
+Game executable dependencies
+Epic compatibility
+GOG compatibility
+Redistribution and licensing issues around proprietary game components
+
+The research was interesting and produced useful findings, but continuing down that road would have turned UbiSlot into a much larger reverse-engineering project.
+
+I decided not to do that.
+
+The original Ubisoft-focused idea was already useful and practical, so UbiSlot returned to that.
+
+THE SERVER-EMULATION IDEA
+
+I also looked at open-source work related to historical Uplay reverse engineering and server emulation, including UplayDB, Ubi-Parser, UplayServer, and related projects.
+
+That work helped with understanding older Ubisoft protocols, protobuf structures, and general architecture.
+
+I did not move UbiSlot to a custom Uplay server emulator.
+
+The local spool approach was already practical and much closer to what I originally wanted.
+
+A custom Ubisoft server remains a theoretical fallback only if Ubisoft changes its spool or session system enough to break the local approach.
+
+THE STEAMTEST LAB
+
+The broader Steam work was kept in a separate experimental project called SteamTest.
+
+That was deliberate.
+
+I did not want uncertain Steam experiments constantly destabilizing the actual Ubisoft application.
+
+SteamTest became the place to:
+
+Load UplayGames.txt
+Find the Rogue Game ID
+Resolve the Steam AppID
+Start the Ubisoft session
+Initialize real Steam
+Load Ubisoft achievement definitions
+Load Steam achievements
+Match names
+Read achievement state
+Test the write path
+
+That separation was useful because it kept the main UbiSlot project focused while the Steam problem was still unresolved.
+
+WHAT THE ROGUE EXPERIMENT ACTUALLY PROVED
+
+The Rogue investigation established these concrete points:
+
+The correct Steam AppID is 311560.
+
+The tested Rogue configuration has 46 Ubisoft achievements and 46 Steam achievements.
+
+SteamAPI_InitSafe can succeed.
+
+The Steam user and SteamID can be obtained.
+
+Current stats can be requested successfully.
+
+The UserStatsReceived callback can arrive successfully.
+
+All achievement definitions can be loaded.
+
+All 46 achievement names can be mapped.
+
+GetAchievement can read the locked state.
+
+SetAchievement consistently returned false for the pending test achievement.
+
+StoreStats could return true even when no achievement had been changed.
+
+A legitimate Rogue launch can synchronize an already-unlocked Ubisoft achievement to Steam.
+
+External direct Steam API calls did not reproduce that synchronization.
+
+Those findings were enough for me to stop treating generic client-side Steam achievement writes as part of the current UbiSlot product.
+
+THE FINAL UBISOFT PRODUCT
+
+After all of that research, I deliberately returned to the original idea.
+
+The current UbiSlot focuses on:
+
+Ubisoft ownership detection
+Ubisoft game identification
+Local achievement archive handling
+Achievement browsing
+Achievement search
+Achievement sorting
+Achievement selection
+Local achievement unlocking
+Achievement-data backups
+Session-original restoration
+Ubisoft-managed session handling
+Game covers as a visual enhancement
+Dark and light themes
+Settings
+Automatic update checking
+Custom dialogue UI
+Game library presentation
+Pinned games and completion information
+
+The product is intentionally Ubisoft-only.
+
+Steam, Epic, and GOG achievement synchronization were explored during development, but they are not part of the current release.
+
+CURRENT SOURCE STRUCTURE
+
+The final project is organized into these major parts:
+
+UbiSlot
+
+Core
+    AchievementDefinition.cs
+    SpoolRecord.cs
+    UbiSlotSettings.cs
+
+Games
+    GameCoverService.cs
+    GameDatabase.cs
+    UplayGames.txt
+
+Ubisoft
+    AchievementCache.cs
+    Ownership.cs
+    SpoolManager.cs
+    UbisoftConnectSdk.cs
+    UbisoftGameLauncher.cs
+
+UI
+    AchievementWindow.xaml
+    AchievementWindow.xaml.cs
+    MainWindow.xaml
+    MainWindow.xaml.cs
+    SettingsWindow.xaml
+    SettingsWindow.xaml.cs
+    SupportWindow.xaml
+    SupportWindow.xaml.cs
+    Dialogue.xaml
+    Dialogue.xaml.cs
+    UbiSlot.ico
+    UbiSlot_logo.png
+
+App.xaml
+App.xaml.cs
+
+The idea is to keep core data models separate from game services, Ubisoft logic, and the WPF UI.
+
+THE FINAL UBISOFT DATA PIPELINE
+
+The retained data pipeline is:
+
+Ubisoft ownership cache
+→ Ubisoft Game ID
+→ GameDatabase lookup
+→ game name
+→ achievement archive
+→ achievement definitions
+→ per-user spool file
+→ spool records
+→ achievement state
+→ AchievementWindow
+→ user selection
+→ spool write
+
+Because the data and presentation layers are separated, I can change the UI without having to rewrite the underlying Ubisoft data handling.
+
+THE FINAL SESSION PIPELINE
+
+The retained session flow is:
+
+MainWindow
+→ user selects a Ubisoft game
+→ MainWindow launches UbiSlot with the Game ID
+→ bootstrap instance starts the Ubisoft session
+→ Ubisoft Connect manages the session
+→ Ubisoft Connect launches the managed UbiSlot instance
+→ managed UbiSlot opens AchievementWindow
+→ AchievementWindow verifies the running Ubisoft game
+→ AchievementWindow captures the original spool state
+→ AchievementWindow loads achievement data
+→ user selects achievements
+→ UbiSlot writes local achievement changes immediately
+→ Restore Original can restore the session-start state while the window remains open
+→ the Ubisoft session ends independently of the AchievementWindow window lifecycle
+
+The point of the design is that UbiSlot does not need to invent a fake Ubisoft session. Ubisoft Connect remains responsible for the legitimate session.
+
+WHY I STOPPED ADDING THINGS
+
+One of the main lessons from the project was that a technically possible feature is not automatically a good feature.
+
+The local Ubisoft spool workflow was practical and already worked.
+
+The Steam synchronization project introduced a different set of problems involving legacy APIs, game-specific behavior, backend authorization, and cross-platform synchronization.
+
+Adding more features would have been easy. Adding more features while knowing exactly how they work and whether they are reliable is much harder.
+
+That is why the current UbiSlot release is deliberately focused.
+
+UBISAVE IS A SEPARATE PROJECT
+
+After UbiSlot reached a point where I was satisfied with the feature set, I wanted to move on instead of turning it into an endlessly expanding project.
+
+The next planned project is UbiSave, a save editor.
+
+UbiSave is separate from UbiSlot.
+
+UbiSlot stays an achievement management tool.
+
+UbiSave will be developed independently rather than being folded into the UbiSlot codebase.
+
+TESTING
+
+The current v0.3.0-beta release is feature-complete for this development cycle, but it is still a beta.
+
+The next stage is testing.
+
+The useful things to test are:
+
+Different Ubisoft games
+Games that already have spool files
+Games that do not have spool files
+Games with many achievements
+Games with already unlocked achievements
+Individual achievement unlocks
+Multiple achievement unlocks
+Backup creation
+Restore Original
+Closing and reopening sessions
+Already-running game sessions
+Different Ubisoft games running in the background
+Dark and light themes
+Search
+Sorting
+Game covers
+Library refresh behavior
+Permissions and file-access failures
+Missing or unusual achievement archives
+
+The point of this phase is to find the bugs that only show up when the program is used against more games and more real installations.
+
+RELEASE VERSIONING
+
+The current release is v0.3.0-beta.
+
+I chose the beta label because the feature set for this development cycle is complete, but the implementation still needs broader testing before it should be considered stable.
+
+The likely progression is:
+
+v0.3.0-beta
+v0.3.0-beta.1 or later bug-fix beta builds if needed
+v0.3.0-rc.1 when the build is ready for final validation
+v0.3.0 as the stable release
+
+A future v1.0.0 should mean that the core UbiSlot product is mature and proven, not simply that enough time has passed or another feature was added.
+
+WHAT I LEARNED
+
+The biggest lessons from UbiSlot were not really about syntax.
+
+They were about investigating systems properly.
+
+Observe the real behavior before designing around an assumption.
+
+Check the exact binary and DLL that are actually being loaded.
+
+Keep proven code separate from experimental code.
+
+Use process trees and logs to understand session boundaries.
+
+Do not assume that an API return value means the operation has actually been accepted by the backend.
+
+Do not assume a modern API interface is the same as the interface used by an old game.
+
+Back up persistent user data before modifying it.
+
+Do not confuse "the API call returned true" with "the requested state change actually happened."
+
+Do not treat a plausible synchronization design as finished until it works in a real process-lifecycle test.
+
+Keep failed approaches documented. Otherwise it is very easy to repeat the same investigation later and forget why a particular idea was dropped.
+
+FINAL STATUS
+
+UbiSlot v0.3.0-beta is the current feature-complete beta release.
+
+The retained product is focused on Ubisoft game ownership detection, game identification, local achievement archive parsing, achievement browsing, searching, sorting, selection, unlocking, backup and restoration, Ubisoft-managed session handling, game covers, themes, settings, update checking, and custom UI.
+
+The larger Steam, Epic, and GOG synchronization plan was intentionally dropped after extensive investigation showed that generic platform achievement APIs were not enough to reproduce the behavior observed in a legitimate Ubisoft game session.
+
+UbiSlot is now in the testing and stabilization stage.
+
+The next real job is to test what has already been built, find the bugs, fix them, and decide when the current architecture is stable enough for a normal release.
+
+FINAL RECORD
+
+UbiSlot started as a spontaneous idea that came out of a game reverse-engineering hobby.
+
+It grew from runtime inspection and game modding into a real Windows application.
+
+Along the way I investigated Ubisoft ownership data, achievement archives, spool files, legacy Uplay APIs, process relationships, Ubisoft-managed sessions, Windows application behavior, and the relationship between Ubisoft and Steam achievements.
+
+The Steam work was useful even though it was eventually dropped. It showed that a game can have behavior that looks like a normal platform API operation from the outside while still depending on game-specific or session-specific logic that is not reproduced by a generic client call.
+
+In the end, the project became smaller and more focused rather than larger.
+
+The result is UbiSlot: a Ubisoft achievement unlocker and management tool for Windows.
+
+The development path was not a straight line. It was mostly:
+
+Game modding
+→ reverse engineering
+→ observing the real system
+→ testing an idea
+→ breaking something
+→ figuring out why
+→ fixing it
+→ testing again
+→ dropping the parts that became too large
+→ finishing the tool
+
+That is the actual story behind UbiSlot.
