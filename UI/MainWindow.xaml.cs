@@ -42,6 +42,8 @@ public partial class MainWindow : Window
 
     private readonly GameDatabase _gameDatabase;
 
+    private readonly GameVariantResolver _variantResolver;
+
     private readonly GameCoverService _gameCoverService;
 
     private readonly OwnershipManager _ownershipManager;
@@ -59,6 +61,9 @@ public partial class MainWindow : Window
     private UbiSlotSettings _settings;
 
     private int _coverLoadGeneration;
+
+
+    // CONSTRUCTOR
 
     public MainWindow()
     {
@@ -85,6 +90,9 @@ public partial class MainWindow : Window
         _gameDatabase =
             new GameDatabase();
 
+        _variantResolver =
+            new GameVariantResolver(_gameDatabase);
+
         _gameCoverService =
             new GameCoverService();
 
@@ -107,6 +115,8 @@ public partial class MainWindow : Window
 
         _ = CheckForAutomaticUpdateAsync();
     }
+
+    // LOAD GAMES
 
     private async Task LoadGamesAsync()
     {
@@ -137,6 +147,8 @@ public partial class MainWindow : Window
 
             GameCountText.Text =
                 "Scanning...";
+
+            // OWNERSHIP
 
             List<uint> ownedGameIds =
                 _ownershipManager.GetOwnedGameIds();
@@ -250,66 +262,29 @@ public partial class MainWindow : Window
                 }
             }
 
-            var addedNames =
-                new HashSet<string>(
-                    StringComparer.OrdinalIgnoreCase);
+            List<LibraryEntry> libraryEntries =
+                ResolveLibraryEntries(ownedGameIds, spoolEntries);
 
-
-            foreach (
-                uint ownedId
-                in ownedGameIds)
+            foreach (LibraryEntry entry in libraryEntries)
             {
-                string ownershipGameId =
-                    ownedId.ToString();
+                string ownershipGameId = entry.OwnedGameId;
+                string achievementGameId = entry.AchievementGameId;
+                string spoolFile = entry.SpoolFile;
 
+                string? gameName = _gameDatabase.GetGameName(ownershipGameId);
 
-                string? gameName =
-                    _gameDatabase.GetGameName(
-                        ownershipGameId);
-
-
-                if (string.IsNullOrWhiteSpace(
-                        gameName))
+                if (string.IsNullOrWhiteSpace(gameName))
                 {
-                    Console.WriteLine(
-                        "[MainWindow] Unknown ownership ID: " +
-                        $"{ownershipGameId}");
-
+                    Console.WriteLine($"[MainWindow] Unknown ownership ID: {ownershipGameId}");
                     continue;
                 }
 
-
-                string normalizedName =
-                    NormalizeGameName(
-                        gameName);
-
-
-                if (!addedNames.Add(
-                        normalizedName))
+                if (entry.NeedsIdLabel)
                 {
-                    Console.WriteLine(
-                        "[MainWindow] Duplicate skipped: " +
-                        $"{gameName}");
-
-                    continue;
+                    gameName = $"{gameName} (ID {ownershipGameId})";
                 }
 
-                SpoolEntry? matchingSpool =
-                    FindMatchingSpool(
-                        ownershipGameId,
-                        normalizedName,
-                        spoolEntries);
-
-
-                string spoolFile =
-                    matchingSpool?.SpoolFile
-                    ?? string.Empty;
-
-
-                string achievementGameId =
-                    matchingSpool?.GameId
-                    ?? ownershipGameId;
-
+                string normalizedName = NormalizeGameName(gameName);
 
                 int unlocked =
                     0;
@@ -317,7 +292,6 @@ public partial class MainWindow : Window
 
                 int total =
                     0;
-
 
                 if (!string.IsNullOrWhiteSpace(
                         spoolFile) &&
@@ -392,7 +366,6 @@ public partial class MainWindow : Window
                     }
                 }
 
-
                 if (_settings.HideZeroAchievementGames &&
                     total == 0)
                 {
@@ -405,7 +378,7 @@ public partial class MainWindow : Window
 
                     continue;
                 }
-
+             
                 string? coverPath =
                     null;
 
@@ -434,11 +407,8 @@ public partial class MainWindow : Window
                             coverPath,
 
                         IsPinned =
-                            uint.TryParse(
-                                ownershipGameId,
-                                out uint parsedGameId) &&
-                            _pinnedGameIds.Contains(
-                                parsedGameId)
+                            uint.TryParse(ownershipGameId, out uint parsedGameId) &&
+                            _variantResolver.GetVariantIds(parsedGameId).Any(_pinnedGameIds.Contains)
                     });
             }
 
@@ -527,32 +497,55 @@ public partial class MainWindow : Window
         }
     }
 
-    private static SpoolEntry? FindMatchingSpool(
-        string ownershipGameId,
-        string normalizedName,
+    private sealed record LibraryEntry(
+        string OwnedGameId,
+        string AchievementGameId,
+        string SpoolFile,
+        bool NeedsIdLabel);
+
+    private List<LibraryEntry> ResolveLibraryEntries(
+        List<uint> ownedGameIds,
         List<SpoolEntry> spoolEntries)
     {
-        SpoolEntry? exact =
-            spoolEntries.FirstOrDefault(
-                spool =>
-                    string.Equals(
-                        spool.GameId,
-                        ownershipGameId,
-                        StringComparison.OrdinalIgnoreCase));
+        var entries = new List<LibraryEntry>();
+        var seenFamilies = new HashSet<string>(StringComparer.Ordinal);
 
-
-        if (exact != null)
+        foreach (uint ownedId in ownedGameIds)
         {
-            return exact;
+            if (!seenFamilies.Add(_variantResolver.GetFamilyKey(ownedId)))
+            {
+                continue;
+            }
+
+            string ownedIdText = ownedId.ToString();
+            IReadOnlyList<uint> familyIds = _variantResolver.GetVariantIds(ownedId);
+
+            List<SpoolEntry> variantSpools =
+                spoolEntries
+                    .Where(spool =>
+                        uint.TryParse(spool.GameId, out uint id) &&
+                        familyIds.Contains(id))
+                    .GroupBy(spool => spool.GameId)
+                    .Select(group => group.First())
+                    .ToList();
+
+            if (variantSpools.Count == 0)
+            {
+                entries.Add(new LibraryEntry(ownedIdText, ownedIdText, string.Empty, false));
+                continue;
+            }
+
+            foreach (SpoolEntry spool in variantSpools)
+            {
+                entries.Add(new LibraryEntry(
+                    ownedIdText,
+                    spool.GameId,
+                    spool.SpoolFile,
+                    variantSpools.Count > 1));
+            }
         }
 
-
-        return spoolEntries.FirstOrDefault(
-            spool =>
-                string.Equals(
-                    spool.NormalizedName,
-                    normalizedName,
-                    StringComparison.OrdinalIgnoreCase));
+        return entries;
     }
 
     private static string NormalizeGameName(
@@ -673,6 +666,15 @@ public partial class MainWindow : Window
             atBottom ? 1 : 0;
     }
 
+    private void LoadButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        LogActivity(
+            "LOAD_CLICK",
+            "Load button clicked");
+
+    }
     private void SearchButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -708,11 +710,13 @@ public partial class MainWindow : Window
             System.Windows.Threading.DispatcherPriority.Input);
     }
 
+
     private void SearchPopup_Closed(
         object? sender,
         EventArgs e)
     {
     }
+
 
     private void GameSearchBox_TextChanged(
         object sender,
@@ -726,7 +730,6 @@ public partial class MainWindow : Window
 
         UpdateGameList();
     }
-
 
     private void GameSearchBox_KeyDown(
         object sender,
@@ -1120,6 +1123,7 @@ public partial class MainWindow : Window
         content.Children.Add(
             cover);
 
+        // GAME NAME
 
         if (_settings.ShowGameName)
         {
@@ -1500,7 +1504,6 @@ public partial class MainWindow : Window
             return;
         }
 
-
         scale.BeginAnimation(
             ScaleTransform.ScaleXProperty,
             null);
@@ -1597,7 +1600,6 @@ public partial class MainWindow : Window
 
         skew.AngleY =
             x * 2.2;
-
 
         translate.X =
             x * 3.5;
@@ -2065,7 +2067,7 @@ public partial class MainWindow : Window
             Console.WriteLine(
                 $"[MainWindow] Running Ubisoft ID: {runningGameId.Value}");
 
-            if (runningGameId.Value == selectedGameId)
+            if (_variantResolver.IsSameGame(runningGameId.Value, selectedGameId))
             {
                 Console.WriteLine(
                     "[MainWindow] Running game matches selected game by Ubisoft ID.");
@@ -2087,9 +2089,8 @@ public partial class MainWindow : Window
                     Visibility.Visible;
 
                 await OpenExistingGameAsync(
-                    spoolFile,
-                    gameId);
-
+                    runningGameId.Value == selectedGameId ? spoolFile : string.Empty,
+                    runningGameId.Value.ToString());
                 return;
             }
 
@@ -2138,7 +2139,6 @@ public partial class MainWindow : Window
                     gameId);
 
             achievementWindow.ShowDialog();
-
 
             LogActivity(
                 "ACHIEVEMENT_WINDOW_CLOSE",
@@ -2282,9 +2282,11 @@ public partial class MainWindow : Window
         }
         catch
         {
-            //fetching
+            // Automatic update check here
         }
     }
+
+    // MAIN WINDOW THEME
 
     private void ApplyMainWindowTheme()
     {
@@ -2448,7 +2450,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Logging shouldn't break it
+            // Logging...
         }
     }
 
@@ -2512,7 +2514,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Library loading no matter what!
+
         }
 
         return pinnedIds;
