@@ -33,7 +33,9 @@ public enum AchievementSortMode
 public partial class AchievementWindow : Window
 {
     private string _spoolFile;
-    private readonly string _gameId;
+    private string _gameId;
+
+    private readonly GameVariantResolver _variantResolver;
 
     private readonly SpoolManager _spoolManager;
     private readonly AchievementCache _achievementCache;
@@ -81,6 +83,7 @@ public partial class AchievementWindow : Window
         _spoolManager = new SpoolManager();
         _achievementCache = new AchievementCache();
         _gameDatabase = new GameDatabase();
+        _variantResolver = new GameVariantResolver(_gameDatabase);
 
         Loaded += AchievementWindow_Loaded;
         Closing += AchievementWindow_Closing;
@@ -132,14 +135,20 @@ public partial class AchievementWindow : Window
 
             if (runningGameId.Value != gameId)
             {
-                string runningGameName =
-                    _gameDatabase.GetGameName(
-                        runningGameId.Value.ToString())
-                    ?? $"Game {runningGameId.Value}";
+                if (!_variantResolver.IsSameGame(runningGameId.Value, gameId))
+                {
+                    string runningGameName =
+                        _gameDatabase.GetGameName(runningGameId.Value.ToString())
+                        ?? $"Game {runningGameId.Value}";
 
-                throw new InvalidOperationException(
-                    $"{runningGameName} is running instead of {gameName}.");
+                    throw new InvalidOperationException(
+                        $"{runningGameName} is running instead of {gameName}.");
+                }
+
+                _gameId = runningGameId.Value.ToString();
             }
+
+            // FIND SPOOL
 
             await RefreshSpoolFileAsync();
 
@@ -227,6 +236,18 @@ public partial class AchievementWindow : Window
                             _spoolManager.GetGameId(spoolFile),
                             _gameId,
                             StringComparison.OrdinalIgnoreCase));
+
+            if (exactMatch == null && uint.TryParse(_gameId, out uint requestedId))
+            {
+                exactMatch = spoolFiles.FirstOrDefault(file =>
+                    uint.TryParse(_spoolManager.GetGameId(file), out uint spoolId) &&
+                    _variantResolver.IsSameGame(spoolId, requestedId));
+
+                if (exactMatch != null)
+                {
+                    _gameId = _spoolManager.GetGameId(exactMatch);
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(exactMatch) &&
                 File.Exists(exactMatch))
@@ -338,6 +359,7 @@ public partial class AchievementWindow : Window
             Close();
         }
     }
+
     private void LoadAchievementsWithoutSpool()
     {
         try
@@ -668,6 +690,7 @@ public partial class AchievementWindow : Window
         AchievementList.Children.Add(
             card);
     }
+
     private void SelectionChanged(
         object sender,
         RoutedEventArgs e)
