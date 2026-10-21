@@ -28,7 +28,7 @@ UbiSlot is currently in **beta testing**.
 
 ## Current Version
 
-**UbiSlot `v0.3.0-beta`**
+**UbiSlot `v0.3.1-beta`**
 
 This release is feature-complete for the current development cycle, but thorough testing is still required across different Ubisoft games and installations. Unknown bugs and game-specific compatibility issues may remain.
 
