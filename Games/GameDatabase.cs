@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -28,6 +28,11 @@ public class GameDatabase
             out string? name)
                 ? name
                 : null;
+    }
+
+    public IEnumerable<KeyValuePair<string, string>> GetAllGames()
+    {
+        return _games;
     }
 
     public string GetDebugInfo(
