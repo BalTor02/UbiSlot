@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -74,7 +74,7 @@ public class SpoolManager
             }
             catch
             {
-                // Fall through to the existing spool directories.
+                // Fall thru here
             }
         }
 
@@ -108,12 +108,12 @@ public class SpoolManager
             }
             catch
             {
-                // Continue
+                // Continue...
             }
         }
 
         throw new DirectoryNotFoundException(
-            "Ubisoft's per-user spool directory could not be identified.");
+            "Spool directory could not be identified.");
     }
 
     private static DateTime GetDirectoryLastWriteTimeUtc(
