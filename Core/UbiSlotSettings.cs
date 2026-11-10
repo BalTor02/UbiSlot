@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
@@ -19,7 +19,7 @@ public sealed class UbiSlotSettings
         "https://api.github.com/repos/BalTor02/UbiSlot/releases";
 
     public const string CurrentVersion =
-        "0.3.0-beta";
+        "0.4.0-beta";
 
     private static readonly HttpClient HttpClient =
         CreateHttpClient();
@@ -277,7 +277,7 @@ public sealed class UbiSlotSettings
         }
         catch
         {
-    
+
         }
     }
 
@@ -487,6 +487,7 @@ public sealed class UbiSlotSettings
             rightVersion.PreRelease!);
     }
 
+
     private static ParsedVersion ParseVersion(
         string value)
     {
@@ -534,6 +535,7 @@ public sealed class UbiSlotSettings
                     : null
         };
     }
+
 
     private static int ComparePrerelease(
         string left,
