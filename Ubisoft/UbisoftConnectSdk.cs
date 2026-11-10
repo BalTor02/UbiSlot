@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,7 +24,6 @@ public static class UbisoftConnectSdk
 
     private static UPLAY_StartupDelegate? _startup;
     private static UPLAY_QuitDelegate? _quit;
-    private static UPLAY_ReleaseDelegate? _release;
 
     private static UPLAY_USER_IsConnectedDelegate? _isConnected;
     private static UPLAY_USER_GetStringDelegate? _getAccountId;
@@ -47,10 +46,6 @@ public static class UbisoftConnectSdk
     [UnmanagedFunctionPointer(
         CallingConvention.Cdecl)]
     private delegate int UPLAY_QuitDelegate();
-
-    [UnmanagedFunctionPointer(
-        CallingConvention.Cdecl)]
-    private delegate int UPLAY_ReleaseDelegate();
 
     [UnmanagedFunctionPointer(
         CallingConvention.Cdecl)]
@@ -202,12 +197,15 @@ public static class UbisoftConnectSdk
         }
     }
 
-    public static void Quit()
+    public static bool Quit()
     {
         if (_dll == nint.Zero ||
             _quit == null)
         {
-            return;
+            Console.WriteLine(
+                "[Ubisoft SDK] UPLAY_Quit is unavailable because the SDK is not loaded.");
+
+            return false;
         }
 
         try
@@ -215,40 +213,20 @@ public static class UbisoftConnectSdk
             int result =
                 _quit();
 
+            bool succeeded = result == 1;
+
             Console.WriteLine(
-                $"[Ubisoft SDK] " +
-                $"UPLAY_Quit returned: {result}");
+                $"[Ubisoft SDK] UPLAY_Quit returned: {result} " +
+                (succeeded ? "(success)." : "(not successful)."));
+
+            return succeeded;
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"[Ubisoft SDK] " +
-                $"UPLAY_Quit error: {ex}");
-        }
-    }
+                $"[Ubisoft SDK] UPLAY_Quit error: {ex}");
 
-    public static void Release()
-    {
-        if (_dll == nint.Zero ||
-            _release == null)
-        {
-            return;
-        }
-
-        try
-        {
-            int result =
-                _release();
-
-            Console.WriteLine(
-                $"[Ubisoft SDK] " +
-                $"UPLAY_Release returned: {result}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(
-                $"[Ubisoft SDK] " +
-                $"UPLAY_Release error: {ex}");
+            return false;
         }
     }
 
@@ -256,8 +234,7 @@ public static class UbisoftConnectSdk
     {
         if (_dll != nint.Zero &&
             _startup != null &&
-            _quit != null &&
-            _release != null)
+            _quit != null)
         {
             return;
         }
@@ -297,11 +274,6 @@ public static class UbisoftConnectSdk
                     UPLAY_QuitDelegate>(
                         "UPLAY_Quit");
 
-            _release =
-                GetRequiredDelegate<
-                    UPLAY_ReleaseDelegate>(
-                        "UPLAY_Release");
-
             _isConnected =
                 TryGetDelegate<
                     UPLAY_USER_IsConnectedDelegate>(
@@ -331,7 +303,6 @@ public static class UbisoftConnectSdk
 
             _startup = null;
             _quit = null;
-            _release = null;
             _isConnected = null;
             _getAccountId = null;
             _getTicket = null;
@@ -472,7 +443,6 @@ public static class UbisoftConnectSdk
                 }
                 catch
                 {
-                    // Process exited?
                 }
             }
         }
@@ -566,13 +536,11 @@ public static class UbisoftConnectSdk
                         }
                         catch
                         {
-                            // Ignore malformed registry entries lol.
                         }
                     }
                 }
                 catch
                 {
-                    // Ignore unavailable registry views.
                 }
             }
         }
@@ -604,7 +572,6 @@ public static class UbisoftConnectSdk
         }
         catch
         {
-            // Ignore invalid paths.
         }
     }
 
