@@ -1,0 +1,3559 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Pipes;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using UbiSlot.Core;
+using UbiSlot.Games;
+using UbiSlot.Ubisoft;
+using WpfBrushes = System.Windows.Media.Brushes;
+using WpfButton = System.Windows.Controls.Button;
+using WpfColor = System.Windows.Media.Color;
+using WpfCursors = System.Windows.Input.Cursors;
+using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
+using WpfImage = System.Windows.Controls.Image;
+using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
+using WpfMessageBox = System.Windows.MessageBox;
+using WpfMessageBoxButton = System.Windows.MessageBoxButton;
+using WpfMessageBoxImage = System.Windows.MessageBoxImage;
+using WpfMessageBoxResult = System.Windows.MessageBoxResult;
+using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
+using WpfPoint = System.Windows.Point;
+using WpfStretch = System.Windows.Media.Stretch;
+using WpfTextAlignment = System.Windows.TextAlignment;
+using WpfVerticalAlignment = System.Windows.VerticalAlignment;
+
+namespace UbiSlot;
+
+public partial class MainWindow : Window
+{
+    private readonly SpoolManager _spoolManager;
+
+    private readonly AchievementCache _achievementCache;
+
+    private readonly GameDatabase _gameDatabase;
+
+    private readonly GameVariantResolver _variantResolver;
+
+    private readonly GameCoverService _gameCoverService;
+
+    private readonly OwnershipManager _ownershipManager;
+
+    private readonly List<GameCardData> _games = [];
+
+    private readonly HashSet<uint> _pinnedGameIds;
+
+    private readonly Dictionary<string, WpfImage> _coverImages =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly Dictionary<string, TextBlock> _coverFallbacks =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private UbiSlotSettings _settings;
+
+    private int _coverLoadGeneration;
+
+    private readonly Dictionary<string, TextBlock> _achievementTexts =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly Dictionary<string, TextBlock> _completionTexts =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class AchievementUpdateRequest
+    {
+        public string EntitlementProductId { get; set; } = string.Empty;
+
+        public string SessionGameId { get; set; } = string.Empty;
+
+        public string AchievementGameId { get; set; } = string.Empty;
+
+        public string SpoolFile { get; set; } = string.Empty;
+    }
+
+
+    // CONSTRUCTOR
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        _settings =
+            UbiSlotSettings.Load();
+
+        ApplyMainWindowTheme();
+
+        _pinnedGameIds =
+            LoadPinnedGameIds();
+
+        LogActivity(
+            "APP_START",
+            $"UbiSlot started | Pinned games={_pinnedGameIds.Count}");
+
+        _spoolManager =
+            new SpoolManager();
+
+        _achievementCache =
+            new AchievementCache();
+
+        _gameDatabase =
+            new GameDatabase();
+
+        _variantResolver =
+            new GameVariantResolver(_gameDatabase);
+
+        _gameCoverService =
+            new GameCoverService();
+
+        _ownershipManager =
+            new OwnershipManager(
+                _gameDatabase);
+
+        Loaded +=
+            MainWindow_Loaded;
+    }
+
+    private async void MainWindow_Loaded(
+        object sender,
+        RoutedEventArgs e)
+    {
+        Loaded -=
+            MainWindow_Loaded;
+
+        await LoadGamesAsync();
+
+        _ = CheckForAutomaticUpdateAsync();
+    }
+
+    // LOAD GAMES
+
+    private async Task LoadGamesAsync()
+    {
+        int coverGeneration =
+            ++_coverLoadGeneration;
+
+        LogActivity(
+            "LIBRARY_LOAD",
+            "Loading Ubisoft library");
+
+        try
+        {
+            GameGrid.Children.Clear();
+
+            _games.Clear();
+
+
+            GameRunningText.Text =
+                string.Empty;
+
+            GameRunningText.Visibility =
+                Visibility.Collapsed;
+
+
+            StatusText.Text =
+                "Loading Ubisoft ownership...";
+
+
+            GameCountText.Text =
+                "Scanning...";
+
+            // OWNERSHIP
+
+            List<uint> ownedGameIds =
+                _ownershipManager.GetOwnedGameIds();
+
+
+            Console.WriteLine(
+                $"[MainWindow] Owned games: {ownedGameIds.Count}");
+
+            LogActivity(
+                "OWNERSHIP_SCAN",
+                $"Ownership scan completed | Games={ownedGameIds.Count}");
+
+
+            if (ownedGameIds.Count == 0)
+            {
+                GameCountText.Text =
+                    "No owned games found";
+
+                StatusText.Text =
+                    "No Ubisoft ownership data found.";
+
+                return;
+            }
+
+            StatusText.Text =
+                "Scanning achievement data...";
+
+
+            List<string> spoolFiles =
+                _spoolManager.FindSpoolFiles();
+
+
+            Console.WriteLine(
+                $"[MainWindow] Spool files: {spoolFiles.Count}");
+
+            LogActivity(
+                "SPOOL_SCAN",
+                $"Spool scan completed | Files={spoolFiles.Count}");
+
+
+            var spoolEntries =
+                new List<SpoolEntry>();
+
+
+            foreach (
+                string spoolFile
+                in spoolFiles)
+            {
+                try
+                {
+                    string spoolGameId =
+                        _spoolManager.GetGameId(
+                            spoolFile);
+
+
+                    string? spoolGameName =
+                        _gameDatabase.GetGameName(
+                            spoolGameId);
+
+
+                    if (string.IsNullOrWhiteSpace(
+                            spoolGameName))
+                    {
+                        Console.WriteLine(
+                            $"[Spool] Unknown ID: {spoolGameId}");
+
+                        continue;
+                    }
+
+
+                    spoolEntries.Add(
+                        new SpoolEntry
+                        {
+                            AchievementGameId =
+                                spoolGameId,
+
+                            GameName =
+                                spoolGameName,
+
+                            SpoolFile =
+                                spoolFile,
+
+                            NormalizedName =
+                                NormalizeGameName(
+                                    spoolGameName)
+                        });
+
+
+                    Console.WriteLine(
+                        $"[Spool] {spoolGameId} -> {spoolGameName}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        $"[Spool] Failed: {ex.Message}");
+                }
+            }
+
+            if (spoolFiles.Count > 0)
+            {
+                try
+                {
+                    _spoolManager.CreatePermanentBackups(
+                        spoolFiles,
+                        _spoolManager.GetSpoolRoot());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        $"[Spool] Backup failed: {ex.Message}");
+                }
+            }
+
+            var identityResolver =
+                new GameIdentityResolver(
+                    _gameDatabase,
+                    _variantResolver,
+                    _ownershipManager.LatestSpaceIdsByProductId,
+                    _ownershipManager.RuntimeConnectIdsBySpaceId,
+                    _ownershipManager.RuntimeConfigurationsBySpaceId);
+
+            var identityResolutions =
+                ownedGameIds
+                    .Distinct()
+                    .ToDictionary(
+                        productId => productId,
+                        productId => identityResolver.Resolve(productId));
+
+            List<LibraryEntry> libraryEntries =
+                ResolveLibraryEntries(ownedGameIds, spoolEntries, identityResolutions);
+
+            foreach (LibraryEntry entry in libraryEntries)
+            {
+                string entitlementProductId = entry.EntitlementProductId;
+                string achievementGameId = entry.AchievementGameId;
+                string spoolFile = entry.SpoolFile;
+
+                string? gameName = _gameDatabase.GetGameName(entitlementProductId);
+
+                if (string.IsNullOrWhiteSpace(gameName))
+                {
+                    Console.WriteLine($"[MainWindow] Unknown entitlement product ID: {entitlementProductId}");
+                    continue;
+                }
+
+                if (entry.NeedsIdLabel)
+                {
+                    gameName = $"{gameName} (ID {entitlementProductId})";
+                }
+
+                string normalizedName = NormalizeGameName(gameName);
+
+                int unlocked =
+                    0;
+
+
+                int total =
+                    0;
+
+                if (!string.IsNullOrWhiteSpace(
+                        spoolFile) &&
+                    File.Exists(
+                        spoolFile))
+                {
+                    try
+                    {
+                        List<SpoolRecord> records =
+                            _spoolManager.GetRecords(
+                                spoolFile);
+
+
+                        List<AchievementDefinition> achievements =
+                            _achievementCache
+                                .GetAchievementsForGame(
+                                    achievementGameId,
+                                    records);
+
+
+                        total =
+                            achievements.Count;
+
+
+                        unlocked =
+                            achievements.Count(
+                                achievement =>
+                                    achievement.IsUnlocked);
+
+
+                        Console.WriteLine(
+                            "[Achievements] " +
+                            $"{gameName} -> " +
+                            $"{unlocked}/{total} " +
+                            $"using spool {achievementGameId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(
+                            "[Achievements] Failed for " +
+                            $"{gameName}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        List<AchievementDefinition> achievements =
+                            _achievementCache.ReadAchievements(
+                                achievementGameId);
+
+
+                        total =
+                            achievements.Count;
+
+
+                        unlocked =
+                            0;
+
+
+                        Console.WriteLine(
+                            "[Achievements] " +
+                            $"{gameName} -> " +
+                            $"No spool, {total} definitions");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(
+                            "[Achievements] " +
+                            $"No-spool archive lookup failed for " +
+                            $"{gameName}: {ex.Message}");
+                    }
+                }
+
+                if (_settings.HideZeroAchievementGames &&
+                    total == 0)
+                {
+                    Console.WriteLine(
+                        $"[MainWindow] Hidden zero-achievement game: {gameName}");
+
+                    LogActivity(
+                        "GAME_HIDDEN",
+                        $"Zero-achievement game hidden | ID={entitlementProductId} | Name={gameName}");
+
+                    continue;
+                }
+
+                string? coverPath =
+                    null;
+
+                _games.Add(
+                    new GameCardData
+                    {
+                        EntitlementProductId =
+                            entitlementProductId,
+
+                        SessionGameId =
+                            entry.SessionGameId,
+
+                        AchievementGameId =
+                            achievementGameId,
+
+                        GameName =
+                            gameName,
+
+                        SpoolFile =
+                            spoolFile,
+
+                        Unlocked =
+                            unlocked,
+
+                        Total =
+                            total,
+
+                        CoverPath =
+                            coverPath,
+
+                        IsPinned =
+                            uint.TryParse(entitlementProductId, out uint parsedGameId) &&
+                            _variantResolver.GetFamilyMemberIds(parsedGameId).Any(_pinnedGameIds.Contains)
+                    });
+            }
+
+            UpdateGameList();
+            CheckRunningGame();
+
+            StatusText.Text =
+                "Ready";
+
+            LogActivity(
+                "LIBRARY_READY",
+                $"Library ready | Games={_games.Count} | Pinned={_pinnedGameIds.Count}");
+
+            _ = LoadMissingCoversAsync(
+                coverGeneration);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[MainWindow] Load error: {ex}");
+
+            LogActivity(
+                "LIBRARY_ERROR",
+                $"Library load failed | Error={ex}");
+
+            GameGrid.Children.Clear();
+
+
+            GameCountText.Text =
+                "Unable to load games.";
+
+
+            StatusText.Text =
+                "UbiSlot couldn't load your Ubisoft game data.";
+        }
+    }
+
+    private void CheckRunningGame()
+    {
+        try
+        {
+            uint? runningGameId =
+                UbisoftGameLauncher.GetRunningUbisoftGameId();
+
+            if (!runningGameId.HasValue)
+            {
+                GameRunningText.Text =
+                    string.Empty;
+
+                GameRunningText.Visibility =
+                    Visibility.Collapsed;
+
+                Console.WriteLine(
+                    "[Game Running Check] No Ubisoft game detected.");
+
+                return;
+            }
+
+            string runningGameName =
+                _gameDatabase.GetGameName(
+                    runningGameId.Value.ToString())
+                ?? $"Game {runningGameId.Value}";
+
+            GameRunningText.Text =
+                $"{runningGameName} is currently running";
+
+            GameRunningText.Visibility =
+                Visibility.Visible;
+
+            Console.WriteLine(
+                "[Game Running Check] " +
+                $"Running game: {runningGameName} " +
+                $"(Ubisoft ID {runningGameId.Value})");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                "[Game Running Check] " +
+                $"Failed: {ex.Message}");
+
+            GameRunningText.Text =
+                "Unable to determine whether a Ubisoft game is running";
+
+            GameRunningText.Visibility =
+                Visibility.Visible;
+        }
+    }
+
+    private sealed record LibraryEntry(
+        string EntitlementProductId,
+        string SessionGameId,
+        string AchievementGameId,
+        string SpoolFile,
+        bool NeedsIdLabel);
+
+    private List<LibraryEntry> ResolveLibraryEntries(
+        List<uint> ownedGameIds,
+        List<SpoolEntry> spoolEntries,
+        IReadOnlyDictionary<uint, GameIdentityResolution> identityResolutions)
+    {
+        var entries = new List<LibraryEntry>();
+
+        string GetSessionGameId(uint productId)
+        {
+            if (identityResolutions.TryGetValue(productId, out GameIdentityResolution? resolution) &&
+                resolution.SessionGameId.HasValue)
+            {
+                return resolution.SessionGameId.Value.ToString();
+            }
+
+            return string.Empty;
+        }
+
+        uint? GetSessionGameIdValue(uint productId)
+        {
+            return identityResolutions.TryGetValue(productId, out GameIdentityResolution? resolution) &&
+                   resolution.SessionGameId.HasValue
+                ? resolution.SessionGameId.Value
+                : null;
+        }
+
+        uint GetFallbackAchievementId(uint productId)
+        {
+            IReadOnlyList<uint> preferredIds =
+                GameIdMappingOverrides.GetPreferredAchievementIds(
+                    productId,
+                    _gameDatabase,
+                    _variantResolver);
+
+            return preferredIds.Count > 0
+                ? preferredIds[0]
+                : productId;
+        }
+
+        IEnumerable<IGrouping<string, uint>> familyGroups =
+            ownedGameIds
+                .Distinct()
+                .GroupBy(_variantResolver.GetFamilyKey);
+
+        foreach (IGrouping<string, uint> familyGroup in familyGroups)
+        {
+            List<uint> familyOwnedIds = familyGroup
+                .OrderBy(id => id)
+                .ToList();
+
+            if (familyOwnedIds.Count == 0)
+            {
+                continue;
+            }
+
+            IReadOnlyList<uint> familyIds =
+                _variantResolver.GetFamilyMemberIds(familyOwnedIds[0]);
+
+            List<SpoolEntry> familySpools =
+                spoolEntries
+                    .Where(spool =>
+                        uint.TryParse(spool.AchievementGameId, out uint spoolId) &&
+                        familyIds.Contains(spoolId))
+                    .GroupBy(spool => spool.AchievementGameId)
+                    .Select(group => group.First())
+                    .ToList();
+
+            Console.WriteLine(
+                $"[Variant Family] {familyGroup.Key} | " +
+                $"Owned IDs: {string.Join(", ", familyOwnedIds)} | " +
+                $"Family spool IDs: {string.Join(", ", familySpools.Select(spool => spool.AchievementGameId))}");
+
+            int familyVariantCount = familyOwnedIds
+                .Select(_variantResolver.GetVariantKey)
+                .Concat(
+                    familySpools
+                        .Select(spool => uint.TryParse(spool.AchievementGameId, out uint spoolId)
+                            ? _variantResolver.GetVariantKey(spoolId)
+                            : string.Empty))
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+
+            IEnumerable<IGrouping<string, uint>> ownedVariantGroups =
+                familyOwnedIds.GroupBy(_variantResolver.GetVariantKey);
+
+            foreach (IGrouping<string, uint> ownedVariantGroup in ownedVariantGroups)
+            {
+                List<uint> ownedVariantIds = ownedVariantGroup
+                    .OrderBy(id => id)
+                    .ToList();
+
+                uint representativeOwnedId = ownedVariantIds[0];
+
+                Console.WriteLine(
+                    $"[Variant Group] Family: {familyGroup.Key} | " +
+                    $"Variant: {ownedVariantGroup.Key} | " +
+                    $"Owned IDs: {string.Join(", ", ownedVariantIds)}");
+
+                var spoolSearchOrder = new List<uint>();
+
+                foreach (uint ownedId in ownedVariantIds)
+                {
+                    IReadOnlyList<uint> productSearchOrder =
+                        GameIdMappingOverrides.GetSpoolSearchOrder(
+                            ownedId,
+                            GetSessionGameIdValue(ownedId),
+                            _gameDatabase,
+                            _variantResolver);
+
+                    foreach (uint candidateId in productSearchOrder)
+                    {
+                        if (!spoolSearchOrder.Contains(candidateId))
+                        {
+                            spoolSearchOrder.Add(candidateId);
+                        }
+                    }
+                }
+
+                Console.WriteLine(
+                    $"[Variant Group] Spool search order: {string.Join(", ", spoolSearchOrder)}");
+
+                var spoolById = new Dictionary<uint, SpoolEntry>();
+                foreach (SpoolEntry familySpool in familySpools)
+                {
+                    if (uint.TryParse(familySpool.AchievementGameId, out uint parsedSpoolId) &&
+                        !spoolById.ContainsKey(parsedSpoolId))
+                    {
+                        spoolById.Add(parsedSpoolId, familySpool);
+                    }
+                }
+
+                SpoolEntry? selectedSpool = null;
+                uint selectedSpoolId = 0;
+
+                foreach (uint candidateId in spoolSearchOrder)
+                {
+                    if (spoolById.TryGetValue(candidateId, out SpoolEntry? candidateSpool))
+                    {
+                        selectedSpool = candidateSpool;
+                        selectedSpoolId = candidateId;
+                        break;
+                    }
+                }
+
+                var matchingSpools = new List<SpoolEntry>();
+                if (selectedSpool != null)
+                {
+                    matchingSpools.Add(selectedSpool);
+                }
+
+                if (selectedSpool != null)
+                {
+                    bool familyFallback =
+                        !_variantResolver.IsSameVariant(representativeOwnedId, selectedSpoolId);
+
+                    if (familyFallback)
+                    {
+                        Console.WriteLine(
+                            $"[Variant Group] FAMILY SPOOL FALLBACK | requested={representativeOwnedId} | selectedAchievementId={selectedSpoolId} | family={familyGroup.Key}");
+                    }
+                    else if (!ownedVariantIds.Contains(selectedSpoolId))
+                    {
+                        Console.WriteLine(
+                            $"[Variant Group] Storefront-equivalent spool selected | requested={representativeOwnedId} | achievementId={selectedSpoolId}");
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"[Variant Group] Exact spool selected | achievementId={selectedSpoolId}");
+                    }
+                }
+
+                Console.WriteLine(
+                    $"[Variant Group] Matching spool IDs: " +
+                    $"{string.Join(", ", matchingSpools.Select(spool => spool.AchievementGameId))}");
+
+                bool needsVariantLabel =
+                    familyVariantCount > 1 || ownedVariantIds.Count > 1;
+
+                if (matchingSpools.Count == 0)
+                {
+                    foreach (uint ownedId in ownedVariantIds)
+                    {
+                        string ownedIdText = ownedId.ToString();
+                        string achievementId = GetFallbackAchievementId(ownedId).ToString();
+
+                        Console.WriteLine(
+                            $"[Library] No family spool found for product {ownedId}; achievement definitions will use ID {achievementId}.");
+
+                        entries.Add(new LibraryEntry(
+                            ownedIdText,
+                            GetSessionGameId(ownedId),
+                            achievementId,
+                            string.Empty,
+                            needsVariantLabel));
+                    }
+
+                    continue;
+                }
+
+                SpoolEntry spool = matchingSpools[0];
+                if (!uint.TryParse(spool.AchievementGameId, out uint spoolId))
+                {
+                    continue;
+                }
+
+                uint? selectedOwnershipId = ownedVariantIds
+                    .Where(id => id == spoolId)
+                    .Select(id => (uint?)id)
+                    .FirstOrDefault();
+
+                if (!selectedOwnershipId.HasValue && ownedVariantIds.Count == 1)
+                {
+                    selectedOwnershipId = ownedVariantIds[0];
+                }
+
+                if (!selectedOwnershipId.HasValue)
+                {
+                    Console.WriteLine(
+                        "[Library] Ambiguous storefront ownership match; " +
+                        $"skipping fallback spool {spoolId} for family '{familyGroup.Key}'. " +
+                        "More than one owned product could claim this spool.");
+
+                    continue;
+                }
+
+                entries.Add(new LibraryEntry(
+                    selectedOwnershipId.Value.ToString(),
+                    GetSessionGameId(selectedOwnershipId.Value),
+                    spool.AchievementGameId,
+                    spool.SpoolFile,
+                    needsVariantLabel));
+            }
+        }
+
+        return entries;
+    }
+
+    private static string NormalizeGameName(
+        string name)
+    {
+        string normalized =
+            name
+                .Replace("®", "")
+                .Replace("™", "")
+                .Replace("©", "")
+                .Replace("(Steam)", "")
+                .Replace("_", " ")
+                .Replace("-", " ")
+                .Trim();
+
+
+        while (normalized.Contains(
+                   "  ",
+                   StringComparison.Ordinal))
+        {
+            normalized =
+                normalized.Replace(
+                    "  ",
+                    " ");
+        }
+
+
+        return normalized;
+    }
+
+    private void UpdateGameList()
+    {
+        GameGrid.Children.Clear();
+
+        _coverImages.Clear();
+        _coverFallbacks.Clear();
+        _achievementTexts.Clear();
+        _completionTexts.Clear();
+
+
+        string search =
+            GameSearchBox.Text.Trim();
+
+
+        IEnumerable<GameCardData> filtered =
+            _games;
+
+
+        if (!string.IsNullOrWhiteSpace(
+                search))
+        {
+            filtered =
+                _games.Where(
+                    game =>
+                        game.GameName.Contains(
+                            search,
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        game.EntitlementProductId.Contains(
+                            search,
+                            StringComparison.OrdinalIgnoreCase));
+        }
+
+
+        List<GameCardData> visibleGames =
+            filtered
+                .OrderByDescending(
+                    game => game.IsPinned)
+                .ToList();
+
+
+        foreach (
+            GameCardData game
+            in visibleGames)
+        {
+            AddGameCard(
+                game.SpoolFile,
+                game.EntitlementProductId,
+                game.SessionGameId,
+                game.AchievementGameId,
+                game.GameName,
+                game.Unlocked,
+                game.Total,
+                game.CoverPath,
+                game.IsPinned);
+        }
+
+
+        GameCountText.Text =
+            visibleGames.Count == 1
+                ? "1 game found"
+                : $"{visibleGames.Count} games found";
+
+        GameScrollViewer.ScrollToTop();
+        UpdateDisclaimerVisibility();
+    }
+
+    private void GameScrollViewer_ScrollChanged(
+        object sender,
+        ScrollChangedEventArgs e)
+    {
+        UpdateDisclaimerVisibility();
+    }
+
+
+    private void UpdateDisclaimerVisibility()
+    {
+        if (GameScrollViewer.ScrollableHeight <= 0)
+        {
+            DisclaimerContainer.Opacity = 0;
+            return;
+        }
+
+        const double bottomThreshold = 2.0;
+
+        bool atBottom =
+            GameScrollViewer.VerticalOffset >=
+            GameScrollViewer.ScrollableHeight - bottomThreshold;
+
+        DisclaimerContainer.Opacity =
+            atBottom ? 1 : 0;
+    }
+
+    private void LoadButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        LogActivity(
+            "LOAD_CLICK",
+            "Manual spool file selection requested");
+
+        try
+        {
+            string userSpoolDirectory =
+                _spoolManager.GetUserSpoolDirectory();
+
+            if (!Directory.Exists(userSpoolDirectory))
+            {
+                WpfMessageBox.Show(
+                    "The Ubisoft spool directory could not be found. " +
+                    "Make sure Ubisoft Connect is installed and has been run at least once.",
+                    "UbiSlot",
+                    WpfMessageBoxButton.OK,
+                    WpfMessageBoxImage.Warning);
+
+                LogActivity(
+                    "LOAD_DIRECTORY_MISSING",
+                    "Resolved Ubisoft user spool directory does not exist");
+
+                return;
+            }
+
+            var dialog =
+                new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Select a Ubisoft spool file",
+                    InitialDirectory = userSpoolDirectory,
+                    Filter = "Ubisoft spool files (*.spool)|*.spool|All files (*.*)|*.*",
+                    FilterIndex = 1,
+                    CheckFileExists = true,
+                    CheckPathExists = true,
+                    Multiselect = false
+                };
+
+            bool? result =
+                dialog.ShowDialog(this);
+
+            if (result != true)
+            {
+                LogActivity(
+                    "LOAD_CANCELLED",
+                    "Spool file selection cancelled");
+
+                return;
+            }
+
+            string selectedSpoolFile =
+                dialog.FileName;
+
+            if (!string.Equals(
+                    Path.GetExtension(selectedSpoolFile),
+                    ".spool",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                WpfMessageBox.Show(
+                    "Please select a valid Ubisoft .spool file.",
+                    "UbiSlot",
+                    WpfMessageBoxButton.OK,
+                    WpfMessageBoxImage.Warning);
+
+                return;
+            }
+
+            LogActivity(
+                "LOAD_FILE_SELECTED",
+                $"Spool file selected | File={Path.GetFileName(selectedSpoolFile)}");
+
+            var loadedWindow =
+                new LoadedWindow(selectedSpoolFile)
+                {
+                    Owner = this
+                };
+
+            loadedWindow.ShowDialog();
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            LogActivity(
+                "LOAD_DIRECTORY_ERROR",
+                $"Ubisoft spool directory could not be resolved | Error={ex.Message}");
+
+            WpfMessageBox.Show(
+                "UbiSlot couldn't locate your Ubisoft account's spool directory.\n\n" +
+                ex.Message,
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Warning);
+        }
+        catch (Exception ex)
+        {
+            LogActivity(
+                "LOAD_ERROR",
+                $"Manual spool loading failed | Error={ex}");
+
+            WpfMessageBox.Show(
+                "UbiSlot couldn't open the spool file selection window.\n\n" +
+                ex.Message,
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+        }
+    }
+    private void SearchButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (SearchPopup.IsOpen)
+        {
+            SearchPopup.IsOpen =
+                false;
+
+            return;
+        }
+
+
+        SearchPopup.IsOpen =
+            true;
+
+        LogActivity(
+            "SEARCH_OPEN",
+            "Search opened");
+
+
+        Dispatcher.BeginInvoke(
+            new Action(
+                () =>
+                {
+                    GameSearchBox.Focus();
+
+                    Keyboard.Focus(
+                        GameSearchBox);
+
+                    GameSearchBox.SelectAll();
+                }),
+            System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+
+    private void SearchPopup_Closed(
+        object? sender,
+        EventArgs e)
+    {
+    }
+
+
+    private void GameSearchBox_TextChanged(
+        object sender,
+        TextChangedEventArgs e)
+    {
+        if (_games.Count == 0)
+        {
+            return;
+        }
+
+
+        UpdateGameList();
+    }
+
+    private void GameSearchBox_KeyDown(
+        object sender,
+        WpfKeyEventArgs e)
+    {
+        if (e.Key ==
+            Key.Enter)
+        {
+            LogActivity(
+                "SEARCH",
+                $"Search submitted | Query=\"{GameSearchBox.Text.Trim()}\"");
+
+            e.Handled =
+                true;
+        }
+    }
+
+    private void AddGameCard(
+        string spoolFile,
+        string entitlementProductId,
+        string sessionGameId,
+        string achievementGameId,
+        string gameName,
+        int unlocked,
+        int total,
+        string? coverPath,
+        bool isPinned)
+    {
+        double columnWidth =
+            GameGrid.ActualWidth / 5.0;
+
+        if (columnWidth <= 0)
+        {
+            columnWidth =
+                220;
+        }
+
+        double coverWidth =
+            Math.Max(
+                170,
+                Math.Min(
+                    270,
+                    columnWidth - 35));
+
+        double coverHeight =
+            coverWidth * 1.5;
+
+        var button =
+            new WpfButton
+            {
+                Style =
+                    (Style)FindResource(
+                        "GameButtonStyle"),
+
+                Background =
+                    WpfBrushes.Transparent,
+
+                BorderBrush =
+                    WpfBrushes.Transparent,
+
+                BorderThickness =
+                    new Thickness(0),
+
+                Padding =
+                    new Thickness(0),
+
+                Margin =
+                    new Thickness(
+                        6,
+                        8,
+                        6,
+                        20),
+
+                HorizontalContentAlignment =
+                    WpfHorizontalAlignment.Center,
+
+                VerticalContentAlignment =
+                    WpfVerticalAlignment.Top,
+
+                Cursor =
+                    WpfCursors.Hand,
+
+                FocusVisualStyle =
+                    null,
+
+                RenderTransformOrigin =
+                    new WpfPoint(
+                        0.5,
+                        0.5)
+            };
+
+        button.Template =
+            CreateTransparentGameCardTemplate();
+
+        var cardScale =
+            new ScaleTransform(
+                1.0,
+                1.0);
+
+        var cardSkew =
+            new SkewTransform(
+                0.0,
+                0.0);
+
+        var cardTranslate =
+            new TranslateTransform(
+                0.0,
+                0.0);
+
+        var cardTransform =
+            new TransformGroup();
+
+        cardTransform.Children.Add(
+            cardScale);
+
+        cardTransform.Children.Add(
+            cardSkew);
+
+        cardTransform.Children.Add(
+            cardTranslate);
+
+        button.RenderTransform =
+            cardTransform;
+
+        System.Windows.Shapes.Ellipse cursorHalo =
+            new System.Windows.Shapes.Ellipse
+            {
+                Width =
+                    180,
+
+                Height =
+                    180,
+
+                Fill =
+                    new RadialGradientBrush
+                    {
+                        GradientOrigin =
+                            new WpfPoint(0.5, 0.5),
+
+                        Center =
+                            new WpfPoint(0.5, 0.5),
+
+                        RadiusX =
+                            0.5,
+
+                        RadiusY =
+                            0.5,
+
+                        GradientStops =
+                            new GradientStopCollection
+                            {
+                                new GradientStop(
+                                    WpfColor.FromArgb(85, 61, 27, 93),
+                                    0.0),
+
+                                new GradientStop(
+                                    WpfColor.FromArgb(95, 61, 27, 93),
+                                    0.30),
+
+                                new GradientStop(
+                                    WpfColor.FromArgb(58, 61, 27, 93),
+                                    0.62),
+
+                                new GradientStop(
+                                    WpfColor.FromArgb(0, 61, 27, 93),
+                                    1.0)
+                            }
+                    },
+
+                Opacity =
+                    0.0,
+
+                IsHitTestVisible =
+                    false
+            };
+
+
+        var content =
+            new StackPanel
+            {
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Center
+            };
+
+
+        var cardLayout =
+            new Grid();
+
+        cardLayout.Children.Add(
+            content);
+
+        WpfButton pinButton =
+            CreatePinButton(
+                entitlementProductId,
+                gameName,
+                isPinned);
+
+        Grid.SetZIndex(
+            pinButton,
+            10);
+
+        cardLayout.Children.Add(
+            pinButton);
+
+        var cover =
+            new Border
+            {
+                Width =
+                    coverWidth,
+
+                Height =
+                    coverHeight,
+
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Center,
+
+                Background =
+                    new SolidColorBrush(
+                        WpfColor.FromRgb(
+                            36,
+                            36,
+                            44)),
+
+                CornerRadius =
+                    new CornerRadius(10)
+            };
+
+
+        cover.Clip =
+            new RectangleGeometry(
+                new Rect(
+                    0,
+                    0,
+                    coverWidth,
+                    coverHeight),
+                10,
+                10);
+
+
+        var coverLayout =
+            new Grid();
+
+
+        var fallbackText =
+            new TextBlock
+            {
+                Text =
+                    entitlementProductId,
+
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Center,
+
+                VerticalAlignment =
+                    WpfVerticalAlignment.Center,
+
+                FontSize =
+                    24,
+
+                Foreground =
+                    new SolidColorBrush(
+                        WpfColor.FromRgb(
+                            130,
+                            130,
+                            140))
+            };
+
+
+        coverLayout.Children.Add(
+            fallbackText);
+
+
+        var coverImage =
+            new WpfImage
+            {
+                Stretch =
+                    WpfStretch.Uniform,
+
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Stretch,
+
+                VerticalAlignment =
+                    WpfVerticalAlignment.Stretch,
+
+                Visibility =
+                    Visibility.Collapsed
+            };
+
+
+        if (!string.IsNullOrWhiteSpace(
+                coverPath) &&
+            File.Exists(
+                coverPath))
+        {
+            try
+            {
+                coverImage.Source =
+                    new BitmapImage(
+                        new Uri(
+                            coverPath,
+                            UriKind.Absolute));
+
+                coverImage.Visibility =
+                    Visibility.Visible;
+
+                fallbackText.Visibility =
+                    Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[Cover] Cached image failed for {gameName}: " +
+                    $"{ex.Message}");
+            }
+        }
+
+
+        coverLayout.Children.Add(
+            coverImage);
+
+        cover.Child =
+            coverLayout;
+
+
+        _coverImages[entitlementProductId] =
+            coverImage;
+
+        _coverFallbacks[entitlementProductId] =
+            fallbackText;
+
+        var cursorHaloLayer =
+            new Canvas
+            {
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Stretch,
+
+                VerticalAlignment =
+                    WpfVerticalAlignment.Stretch,
+
+                IsHitTestVisible =
+                    false,
+
+                Clip =
+                    new RectangleGeometry(
+                        new Rect(
+                            0,
+                            0,
+                            coverWidth,
+                            coverHeight),
+                        10,
+                        10)
+            };
+
+        Canvas.SetLeft(
+            cursorHalo,
+            -cursorHalo.Width / 2.0);
+
+        Canvas.SetTop(
+            cursorHalo,
+            -cursorHalo.Height / 2.0);
+
+        cursorHaloLayer.Children.Add(
+            cursorHalo);
+
+        coverLayout.Children.Add(
+            cursorHaloLayer);
+
+
+        button.MouseMove +=
+            (_, e) =>
+            {
+                UpdateGameCardHover(
+                    button,
+                    cardScale,
+                    cardSkew,
+                    cardTranslate,
+                    cover,
+                    cursorHalo,
+                    e);
+            };
+
+        button.MouseLeave +=
+            (_, _) =>
+            {
+                ResetGameCardHover(
+                    cardScale,
+                    cardSkew,
+                    cardTranslate,
+                    cursorHalo);
+            };
+
+
+        content.Children.Add(
+            cover);
+
+        // GAME NAME
+
+        if (_settings.ShowGameName)
+        {
+            var gameNameText =
+                new TextBlock
+                {
+                    Text =
+                        gameName,
+
+                    Width =
+                        coverWidth,
+
+                    Margin =
+                        new Thickness(
+                            0,
+                            14,
+                            0,
+                            0),
+
+                    HorizontalAlignment =
+                        WpfHorizontalAlignment.Center,
+
+                    TextAlignment =
+                        WpfTextAlignment.Center,
+
+                    FontSize =
+                        17,
+
+                    FontWeight =
+                        FontWeights.SemiBold,
+
+                    Foreground =
+                        new SolidColorBrush(
+                            _settings.IsDarkTheme
+                                ? WpfColor.FromRgb(
+                                    135,
+                                    206,
+                                    235)
+                                : WpfColor.FromRgb(
+                                    61,
+                                    27,
+                                    93)),
+
+                    TextWrapping =
+                        TextWrapping.Wrap,
+
+                    Effect =
+                        _settings.IsDarkTheme
+                            ? new DropShadowEffect
+                            {
+                                Color =
+                                    WpfColor.FromRgb(
+                                        16,
+                                        16,
+                                        20),
+
+                                BlurRadius =
+                                    1.5,
+
+                                ShadowDepth =
+                                    0,
+
+                                Opacity =
+                                    1.0
+                            }
+                            : null
+                };
+
+            content.Children.Add(
+                gameNameText);
+        }
+
+        var achievementText =
+            new TextBlock
+            {
+                Text =
+                    total > 0
+                        ? $"{unlocked}/{total} achievements"
+                        : "No achievements",
+
+                Margin =
+                    new Thickness(
+                        0,
+                        _settings.ShowGameName ? 6 : 14,
+                        0,
+                        0),
+
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Center,
+
+                TextAlignment =
+                    WpfTextAlignment.Center,
+
+                Foreground =
+                    new SolidColorBrush(
+                        WpfColor.FromRgb(
+                            255,
+                            127,
+                            80)),
+
+                FontSize =
+                    14,
+
+                FontWeight =
+                    FontWeights.Medium
+            };
+
+        content.Children.Add(
+            achievementText);
+
+        _achievementTexts[entitlementProductId] =
+            achievementText;
+
+        if (_settings.ShowCompletion)
+        {
+            double completion =
+                total > 0
+                    ? (double)unlocked / total * 100.0
+                    : 0.0;
+
+            var completionBackground =
+                new Border
+                {
+                    Background =
+                        new SolidColorBrush(
+                            System.Windows.Media.Color.FromArgb(
+                                185,
+                                10,
+                                10,
+                                14)),
+
+                    CornerRadius =
+                        new CornerRadius(8),
+
+                    Padding =
+                        new Thickness(
+                            10,
+                            5,
+                            10,
+                            5),
+
+                    HorizontalAlignment =
+                        WpfHorizontalAlignment.Center,
+
+                    VerticalAlignment =
+                        WpfVerticalAlignment.Bottom,
+
+                    Margin =
+                        new Thickness(
+                            0,
+                            0,
+                            0,
+                            10),
+
+                    IsHitTestVisible =
+                        false
+                };
+
+            var completionText =
+                new TextBlock
+                {
+                    Text =
+                        total > 0
+                            ? $"{completion:0.#}%"
+                            : "0%",
+
+                    HorizontalAlignment =
+                        WpfHorizontalAlignment.Center,
+
+                    TextAlignment =
+                        WpfTextAlignment.Center,
+
+                    Foreground =
+                        WpfBrushes.White,
+
+                    FontSize =
+                        13,
+
+                    FontWeight =
+                        FontWeights.SemiBold
+                };
+
+            completionBackground.Child =
+                completionText;
+
+            _completionTexts[entitlementProductId] =
+                completionText;
+
+            Grid.SetZIndex(
+                completionBackground,
+                5);
+
+            coverLayout.Children.Add(
+                completionBackground);
+        }
+
+
+        button.Content =
+            cardLayout;
+
+        button.Click +=
+            async (_, _) =>
+            {
+                GameCardData? currentGame =
+                    _games.FirstOrDefault(
+                        game =>
+                            string.Equals(
+                                game.EntitlementProductId,
+                                entitlementProductId,
+                                StringComparison.OrdinalIgnoreCase));
+
+                string currentSessionGameId =
+                    currentGame?.SessionGameId ?? sessionGameId;
+
+                LogActivity(
+                    "GAME_CARD_CLICK",
+                    $"Game card clicked | EntitlementProductID={entitlementProductId} | " +
+                    $"SessionGameID={(string.IsNullOrWhiteSpace(currentSessionGameId) ? "UNRESOLVED" : currentSessionGameId)} | " +
+                    $"AchievementGameID={currentGame?.AchievementGameId ?? achievementGameId} | Name={gameName}");
+
+                await OpenGameAsync(
+                    currentGame?.SpoolFile ?? spoolFile,
+                    currentGame?.EntitlementProductId ?? entitlementProductId,
+                    currentSessionGameId);
+            };
+
+
+        GameGrid.Children.Add(
+            button);
+    }
+
+    private static ControlTemplate CreateTransparentGameCardTemplate()
+    {
+        var template =
+            new ControlTemplate(
+                typeof(WpfButton));
+
+
+        var root =
+            new FrameworkElementFactory(
+                typeof(Border));
+
+        root.SetValue(
+            Border.BackgroundProperty,
+            WpfBrushes.Transparent);
+
+        root.SetValue(
+            Border.BorderThicknessProperty,
+            new Thickness(0));
+
+        root.SetValue(
+            Border.PaddingProperty,
+            new Thickness(0));
+
+
+        var contentPresenter =
+            new FrameworkElementFactory(
+                typeof(ContentPresenter));
+
+        contentPresenter.SetValue(
+            ContentPresenter.HorizontalAlignmentProperty,
+            WpfHorizontalAlignment.Center);
+
+        contentPresenter.SetValue(
+            ContentPresenter.VerticalAlignmentProperty,
+            WpfVerticalAlignment.Top);
+
+
+        root.AppendChild(
+            contentPresenter);
+
+        template.VisualTree =
+            root;
+
+        return template;
+    }
+
+    private async Task LoadMissingCoversAsync(
+        int generation)
+    {
+        List<GameCardData> games =
+            _games.ToList();
+
+        foreach (GameCardData game in games)
+        {
+            if (generation != _coverLoadGeneration)
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(game.CoverPath) &&
+                File.Exists(game.CoverPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                string? coverPath =
+                    await _gameCoverService.GetCoverAsync(
+                        game.GameName);
+
+                if (generation != _coverLoadGeneration)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(coverPath) ||
+                    !File.Exists(coverPath))
+                {
+                    continue;
+                }
+
+                game.CoverPath =
+                    coverPath;
+
+                await Dispatcher.InvokeAsync(
+                    () =>
+                    {
+                        if (generation != _coverLoadGeneration)
+                        {
+                            return;
+                        }
+
+                        UpdateCoverImage(
+                            game.EntitlementProductId,
+                            coverPath);
+                    });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[Cover] Background load failed for " +
+                    $"{game.GameName}: {ex.Message}");
+            }
+        }
+    }
+
+
+    private void UpdateCoverImage(
+        string gameId,
+        string coverPath)
+    {
+        if (!_coverImages.TryGetValue(
+                gameId,
+                out WpfImage? image))
+        {
+            return;
+        }
+
+        try
+        {
+            var bitmap =
+                new BitmapImage();
+
+            bitmap.BeginInit();
+
+            bitmap.CacheOption =
+                BitmapCacheOption.OnLoad;
+
+            bitmap.UriSource =
+                new Uri(
+                    coverPath,
+                    UriKind.Absolute);
+
+            bitmap.EndInit();
+
+            bitmap.Freeze();
+
+            image.Source =
+                bitmap;
+
+            image.Visibility =
+                Visibility.Visible;
+
+            if (_coverFallbacks.TryGetValue(
+                    gameId,
+                    out TextBlock? fallback))
+            {
+                fallback.Visibility =
+                    Visibility.Collapsed;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[Cover] UI update failed for {gameId}: " +
+                $"{ex.Message}");
+        }
+    }
+
+    private static void UpdateGameCardHover(
+        WpfButton button,
+        ScaleTransform scale,
+        SkewTransform skew,
+        TranslateTransform translate,
+        Border cover,
+        System.Windows.Shapes.Ellipse cursorHalo,
+        WpfMouseEventArgs e)
+    {
+        if (button.ActualWidth <= 0 ||
+            button.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        scale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            null);
+
+        scale.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            null);
+
+        skew.BeginAnimation(
+            SkewTransform.AngleXProperty,
+            null);
+
+        skew.BeginAnimation(
+            SkewTransform.AngleYProperty,
+            null);
+
+        translate.BeginAnimation(
+            TranslateTransform.XProperty,
+            null);
+
+        translate.BeginAnimation(
+            TranslateTransform.YProperty,
+            null);
+
+
+        WpfPoint position =
+            e.GetPosition(
+                button);
+
+
+        double normalizedX =
+            Math.Clamp(
+                position.X / button.ActualWidth,
+                0.0,
+                1.0);
+
+        double normalizedY =
+            Math.Clamp(
+                position.Y / button.ActualHeight,
+                0.0,
+                1.0);
+
+
+        double x =
+            (normalizedX - 0.5) * 2.0;
+
+        double y =
+            (normalizedY - 0.5) * 2.0;
+
+
+        double distance =
+            Math.Min(
+                1.0,
+                Math.Sqrt(
+                    (x * x + y * y) / 2.0));
+
+        if (cover.IsMouseOver)
+        {
+            WpfPoint coverPosition =
+                e.GetPosition(
+                    cover);
+
+            Canvas.SetLeft(
+                cursorHalo,
+                coverPosition.X - cursorHalo.Width / 2.0);
+
+            Canvas.SetTop(
+                cursorHalo,
+                coverPosition.Y - cursorHalo.Height / 2.0);
+
+            cursorHalo.Opacity =
+                0.78;
+        }
+        else
+        {
+            cursorHalo.Opacity =
+                0.0;
+        }
+
+
+        double scaleAmount =
+            1.0 +
+            (0.012 * distance);
+
+        scale.ScaleX =
+            scaleAmount;
+
+        scale.ScaleY =
+            scaleAmount;
+
+
+        skew.AngleX =
+            -y * 2.2;
+
+        skew.AngleY =
+            x * 2.2;
+
+        translate.X =
+            x * 3.5;
+
+        translate.Y =
+            y * 3.5;
+    }
+
+
+    private static void ResetGameCardHover(
+        ScaleTransform scale,
+        SkewTransform skew,
+        TranslateTransform translate,
+        System.Windows.Shapes.Ellipse cursorHalo)
+    {
+        const double durationMilliseconds =
+            140.0;
+
+
+        cursorHalo.Opacity =
+            0.0;
+
+
+        var easing =
+            new CubicEase
+            {
+                EasingMode =
+                    EasingMode.EaseOut
+            };
+
+
+        var scaleXAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    1.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        var scaleYAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    1.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        var skewXAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    0.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        var skewYAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    0.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        var translateXAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    0.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        var translateYAnimation =
+            new DoubleAnimation
+            {
+                To =
+                    0.0,
+
+                Duration =
+                    TimeSpan.FromMilliseconds(
+                        durationMilliseconds),
+
+                EasingFunction =
+                    easing
+            };
+
+
+        scale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            scaleXAnimation);
+
+        scale.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            scaleYAnimation);
+
+        skew.BeginAnimation(
+            SkewTransform.AngleXProperty,
+            skewXAnimation);
+
+        skew.BeginAnimation(
+            SkewTransform.AngleYProperty,
+            skewYAnimation);
+
+        translate.BeginAnimation(
+            TranslateTransform.XProperty,
+            translateXAnimation);
+
+
+        translateYAnimation.Completed +=
+            (_, _) =>
+            {
+                scale.BeginAnimation(
+                    ScaleTransform.ScaleXProperty,
+                    null);
+
+                scale.BeginAnimation(
+                    ScaleTransform.ScaleYProperty,
+                    null);
+
+                skew.BeginAnimation(
+                    SkewTransform.AngleXProperty,
+                    null);
+
+                skew.BeginAnimation(
+                    SkewTransform.AngleYProperty,
+                    null);
+
+                translate.BeginAnimation(
+                    TranslateTransform.XProperty,
+                    null);
+
+                translate.BeginAnimation(
+                    TranslateTransform.YProperty,
+                    null);
+
+
+                scale.ScaleX =
+                    1.0;
+
+                scale.ScaleY =
+                    1.0;
+
+                skew.AngleX =
+                    0.0;
+
+                skew.AngleY =
+                    0.0;
+
+                translate.X =
+                    0.0;
+
+                translate.Y =
+                    0.0;
+            };
+
+
+        translate.BeginAnimation(
+            TranslateTransform.YProperty,
+            translateYAnimation);
+    }
+
+    private WpfButton CreatePinButton(
+        string gameId,
+        string gameName,
+        bool isPinned)
+    {
+        var pinButton =
+            new WpfButton
+            {
+                Width = 30,
+                Height = 30,
+                HorizontalAlignment =
+                    WpfHorizontalAlignment.Right,
+                VerticalAlignment =
+                    WpfVerticalAlignment.Top,
+                Margin =
+                    new Thickness(0, 2, 2, 0),
+                Background =
+                    WpfBrushes.Transparent,
+                BorderThickness =
+                    new Thickness(0),
+                Padding =
+                    new Thickness(0),
+                Cursor =
+                    WpfCursors.Hand,
+                Focusable =
+                    false,
+                ToolTip =
+                    isPinned
+                        ? "Unpin game"
+                        : "Pin game"
+            };
+
+        pinButton.Template =
+            CreateInvisiblePinButtonTemplate();
+
+        pinButton.Content =
+            CreateHeartIcon(
+                isPinned);
+
+        pinButton.Click +=
+            (_, e) =>
+            {
+                e.Handled = true;
+                TogglePinnedGame(
+                    gameId,
+                    gameName);
+            };
+
+        return pinButton;
+    }
+
+
+    private static ControlTemplate CreateInvisiblePinButtonTemplate()
+    {
+        var template =
+            new ControlTemplate(
+                typeof(WpfButton));
+
+        var borderFactory =
+            new FrameworkElementFactory(
+                typeof(Border));
+
+        borderFactory.SetValue(
+            Border.BackgroundProperty,
+            WpfBrushes.Transparent);
+
+        borderFactory.SetValue(
+            Border.BorderThicknessProperty,
+            new Thickness(0));
+
+        borderFactory.SetValue(
+            Border.PaddingProperty,
+            new Thickness(0));
+
+        var contentPresenterFactory =
+            new FrameworkElementFactory(
+                typeof(ContentPresenter));
+
+        contentPresenterFactory.SetValue(
+            ContentPresenter.HorizontalAlignmentProperty,
+            WpfHorizontalAlignment.Center);
+
+        contentPresenterFactory.SetValue(
+            ContentPresenter.VerticalAlignmentProperty,
+            WpfVerticalAlignment.Center);
+
+        borderFactory.AppendChild(
+            contentPresenterFactory);
+
+        template.VisualTree =
+            borderFactory;
+
+        return template;
+    }
+
+
+    private static System.Windows.Shapes.Path CreateHeartIcon(
+        bool isPinned)
+    {
+        var geometry =
+            Geometry.Parse(
+                "M 12 20 " +
+                "C 11.7 19.75 3 14.05 3 8.5 " +
+                "C 3 5.45 5.15 3 8 3 " +
+                "C 9.65 3 11.05 3.9 12 5.15 " +
+                "C 12.95 3.9 14.35 3 16 3 " +
+                "C 18.85 3 21 5.45 21 8.5 " +
+                "C 21 14.05 12.3 19.75 12 20 " +
+                "Z");
+
+        return new System.Windows.Shapes.Path
+        {
+            Width = 18,
+            Height = 18,
+            Data = geometry,
+
+            Fill =
+                isPinned
+                    ? new SolidColorBrush(
+                        WpfColor.FromRgb(
+                            133,
+                            133,
+                            143))
+                    : WpfBrushes.Transparent,
+
+            Stroke =
+                new SolidColorBrush(
+                    WpfColor.FromRgb(
+                        133,
+                        133,
+                        143)),
+
+            StrokeThickness = 1.35,
+            Stretch = WpfStretch.Uniform,
+
+            HorizontalAlignment =
+                WpfHorizontalAlignment.Center,
+
+            VerticalAlignment =
+                WpfVerticalAlignment.Center,
+
+            IsHitTestVisible = false
+        };
+    }
+
+    private void TogglePinnedGame(
+        string gameId,
+        string gameName)
+    {
+        if (!uint.TryParse(
+                gameId,
+                out uint parsedGameId))
+        {
+            return;
+        }
+
+        bool pinned;
+
+        if (_pinnedGameIds.Contains(
+                parsedGameId))
+        {
+            _pinnedGameIds.Remove(
+                parsedGameId);
+            pinned = false;
+        }
+        else
+        {
+            _pinnedGameIds.Add(
+                parsedGameId);
+            pinned = true;
+        }
+
+        GameCardData? existingGame =
+            _games.FirstOrDefault(
+                game =>
+                    string.Equals(
+                        game.EntitlementProductId,
+                        gameId,
+                        StringComparison.OrdinalIgnoreCase));
+
+        if (existingGame != null)
+        {
+            existingGame.IsPinned =
+                pinned;
+        }
+
+        WritePinChange(
+            pinned,
+            parsedGameId,
+            gameName);
+
+        Console.WriteLine(
+            $"[MainWindow] " +
+            $"Game {(pinned ? "pinned" : "unpinned")}: " +
+            $"{gameName} ({parsedGameId})");
+
+        UpdateGameList();
+    }
+
+    private async Task OpenGameAsync(
+        string spoolFile,
+        string entitlementProductId,
+        string sessionGameId)
+    {
+        SearchPopup.IsOpen =
+            false;
+
+        if (!uint.TryParse(
+                entitlementProductId,
+                out uint selectedProductId))
+        {
+            WpfMessageBox.Show(
+                "The selected entitlement product ID is invalid.",
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+
+            return;
+        }
+
+        bool hasSessionId =
+            uint.TryParse(sessionGameId, out uint selectedSessionGameId);
+
+        string selectedGameName =
+            _gameDatabase.GetGameName(entitlementProductId)
+            ?? $"Game {entitlementProductId}";
+
+        Console.WriteLine();
+        Console.WriteLine(
+            "========== GAME SELECTION ==========");
+        Console.WriteLine(
+            $"[MainWindow] Selected game: {selectedGameName}");
+        Console.WriteLine(
+            $"[MainWindow] Entitlement product ID: {selectedProductId}");
+        Console.WriteLine(
+            $"[MainWindow] Session game ID: {(hasSessionId ? selectedSessionGameId.ToString() : "UNRESOLVED")}");
+        Console.WriteLine(
+            $"[MainWindow] Achievement/spool ID: {Path.GetFileNameWithoutExtension(spoolFile)}");
+
+        LogActivity(
+            "GAME_SELECT",
+            $"Game selected | ProductID={selectedProductId} | SessionID={(hasSessionId ? selectedSessionGameId.ToString() : "UNRESOLVED")} | Name={selectedGameName}");
+
+        try
+        {
+            uint? runningGameId =
+                UbisoftGameLauncher.GetRunningUbisoftGameId();
+
+            if (!runningGameId.HasValue)
+            {
+                Console.WriteLine(
+                    "[MainWindow] No Ubisoft game is currently running.");
+
+                GameRunningText.Text =
+                    string.Empty;
+
+                GameRunningText.Visibility =
+                    Visibility.Collapsed;
+
+                if (!hasSessionId)
+                {
+                    string message =
+                        "UbiSlot could not resolve this product's Ubisoft SDK session ID from Ubisoft runtime metadata. ";
+
+                    Console.WriteLine(
+                        $"[MainWindow] Bootstrap blocked: {message}");
+
+                    StatusText.Text =
+                        "Ubisoft session ID could not be resolved.";
+
+                    WpfMessageBox.Show(
+                        message,
+                        "UbiSlot",
+                        WpfMessageBoxButton.OK,
+                        WpfMessageBoxImage.Warning);
+
+                    return;
+                }
+
+                LogActivity(
+                    "GAME_BOOTSTRAP_REQUEST",
+                    $"No game running; bootstrap requested | ProductID={selectedProductId} | SessionID={selectedSessionGameId} | Name={selectedGameName}");
+
+                await StartBootstrapAsync(
+                    selectedSessionGameId.ToString(),
+                    spoolFile,
+                    selectedProductId.ToString());
+
+                return;
+            }
+
+            string runningGameName =
+                _gameDatabase.GetGameName(
+                    runningGameId.Value.ToString())
+                ?? $"Game {runningGameId.Value}";
+
+            Console.WriteLine(
+                $"[MainWindow] Running game: {runningGameName}");
+            Console.WriteLine(
+                $"[MainWindow] Running Ubisoft ID: {runningGameId.Value}");
+
+            uint identityToCompare = hasSessionId
+                ? selectedSessionGameId
+                : selectedProductId;
+
+            if (_variantResolver.IsSameVariant(runningGameId.Value, identityToCompare))
+            {
+                Console.WriteLine(
+                    "[MainWindow] Running game matches selected game by Ubisoft ID.");
+
+                Console.WriteLine(
+                    "[MainWindow] Opening AchievementWindow directly.");
+
+                Console.WriteLine(
+                    "[MainWindow] UPLAY_Startup() will NOT be called.");
+
+                LogActivity(
+                    "GAME_ATTACH",
+                    $"Existing game session attached | ProductID={selectedProductId} | SessionID={identityToCompare} | Name={selectedGameName}");
+
+                GameRunningText.Text =
+                    $"{runningGameName} is running";
+
+                GameRunningText.Visibility =
+                    Visibility.Visible;
+
+                await OpenExistingGameAsync(
+                    _variantResolver.IsSameVariant(runningGameId.Value, identityToCompare)
+                        ? spoolFile
+                        : string.Empty,
+                    runningGameId.Value.ToString(),
+                    selectedProductId.ToString());
+                return;
+            }
+
+            Console.WriteLine(
+                "[MainWindow] Running Ubisoft game does not match selected game.");
+
+            Console.WriteLine(
+                "[MainWindow] Launch blocked.");
+
+            GameRunningText.Text =
+                $"{runningGameName} is running, please close the game and try again";
+
+            GameRunningText.Visibility =
+                Visibility.Visible;
+
+            StatusText.Text =
+                $"Close {runningGameName} before opening {selectedGameName}.";
+
+            LogActivity(
+                "GAME_BLOCKED",
+                $"Game launch blocked | ProductID={selectedProductId} | SessionID={(hasSessionId ? selectedSessionGameId.ToString() : "UNRESOLVED")} | Selected={selectedGameName} | RunningID={runningGameId.Value} | Running={runningGameName}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[MainWindow] Game launch error: {ex}");
+
+            WpfMessageBox.Show(
+                "UbiSlot couldn't open this game.\n\n" +
+                ex.Message,
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+        }
+    }
+
+    private async Task OpenExistingGameAsync(
+        string spoolFile,
+        string gameId,
+        string entitlementProductId)
+    {
+        try
+        {
+            var achievementWindow =
+                new AchievementWindow(
+                    spoolFile,
+                    gameId);
+
+            achievementWindow.ShowDialog();
+
+            LogActivity(
+                "ACHIEVEMENT_WINDOW_CLOSE",
+                $"Achievement window closed | ID={gameId}");
+
+            await UpdateGameAchievementDataAsync(
+                new AchievementUpdateRequest
+                {
+                    EntitlementProductId = entitlementProductId,
+                    SessionGameId = achievementWindow.SessionGameId,
+                    AchievementGameId = achievementWindow.AchievementGameId,
+                    SpoolFile = achievementWindow.SpoolFile
+                });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                "[MainWindow] " +
+                $"AchievementWindow error: {ex}");
+
+            WpfMessageBox.Show(
+                "UbiSlot couldn't open the achievement window.\n\n" +
+                ex.Message,
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+        }
+    }
+
+    private async Task StartBootstrapAsync(
+        string gameId,
+        string spoolFile,
+        string entitlementProductId)
+    {
+        Console.WriteLine(
+            $"[MainWindow] Starting UbiSlot bootstrap for game {gameId}.");
+
+        NamedPipeServerStream? statusPipeServer = null;
+
+        try
+        {
+            string executablePath =
+                Environment.ProcessPath
+                ?? Process.GetCurrentProcess()
+                    .MainModule?
+                    .FileName
+                ?? throw new InvalidOperationException(
+                    "Could not determine UbiSlot executable path.");
+
+            string statusPipeName =
+                $"UbiSlot.Bootstrap.{Environment.ProcessId}.{Guid.NewGuid():N}";
+
+            statusPipeServer = new NamedPipeServerStream(
+                statusPipeName,
+                PipeDirection.In,
+                1,
+                PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous);
+
+            Task pipeConnectionTask =
+                statusPipeServer.WaitForConnectionAsync();
+
+            var startInfo =
+                new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    WorkingDirectory = AppContext.BaseDirectory,
+                    UseShellExecute = false
+                };
+
+            startInfo.ArgumentList.Add(gameId);
+            startInfo.ArgumentList.Add(spoolFile ?? string.Empty);
+            startInfo.ArgumentList.Add(statusPipeName);
+
+            Process? bootstrapProcess =
+                Process.Start(startInfo);
+
+            if (bootstrapProcess == null)
+            {
+                throw new InvalidOperationException(
+                    "Windows did not start the UbiSlot bootstrap process.");
+            }
+
+            GameCardData? selectedGame =
+                _games.FirstOrDefault(
+                    item => string.Equals(
+                        item.EntitlementProductId,
+                        entitlementProductId,
+                        StringComparison.OrdinalIgnoreCase));
+
+            var updateRequest =
+                new AchievementUpdateRequest
+                {
+                    EntitlementProductId = entitlementProductId,
+                    SessionGameId = gameId,
+                    AchievementGameId = selectedGame?.AchievementGameId ?? string.Empty,
+                    SpoolFile = spoolFile ?? string.Empty
+                };
+
+            Console.WriteLine(
+                $"[MainWindow] Bootstrap UbiSlot started for game {gameId} " +
+                $"(PID {bootstrapProcess.Id}). Waiting for its exit and SDK shutdown status.");
+
+            LogActivity(
+                "BOOTSTRAP",
+                $"Bootstrap started | ID={gameId} | PID={bootstrapProcess.Id}");
+
+            _ = WaitForBootstrapAndUpdateAsync(
+                bootstrapProcess,
+                updateRequest,
+                statusPipeServer,
+                pipeConnectionTask);
+
+            statusPipeServer = null;
+        }
+        catch (Exception ex)
+        {
+            statusPipeServer?.Dispose();
+
+            Console.WriteLine(
+                "[MainWindow] Bootstrap launch error: " + ex);
+
+            WpfMessageBox.Show(
+                "UbiSlot couldn't start the game session.\n\n" +
+                ex.Message,
+                "UbiSlot",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task WaitForBootstrapAndUpdateAsync(
+        Process bootstrapProcess,
+        AchievementUpdateRequest request,
+        NamedPipeServerStream statusPipeServer,
+        Task pipeConnectionTask)
+    {
+        int processId = bootstrapProcess.Id;
+        Task processExitTask = bootstrapProcess.WaitForExitAsync();
+        Task statusTask = ReadBootstrapStatusAsync(
+            statusPipeServer,
+            pipeConnectionTask,
+            processExitTask);
+
+        try
+        {
+            await processExitTask;
+            await statusTask;
+
+            Console.WriteLine(
+                $"[MainWindow] Bootstrap process {processId} exited " +
+                $"with code {bootstrapProcess.ExitCode}. Updating the selected achievement card.");
+
+            if (Dispatcher.HasShutdownStarted ||
+                Dispatcher.HasShutdownFinished)
+            {
+                Console.WriteLine(
+                    "[MainWindow] MainWindow is shutting down; skipping the post-bootstrap card update.");
+                return;
+            }
+
+            Task<bool> updateTask =
+                await Dispatcher.InvokeAsync(
+                    () => UpdateGameAchievementDataAsync(request)).Task;
+
+            bool updated =
+                await updateTask;
+
+            Console.WriteLine(
+                updated
+                    ? "[MainWindow] Post-bootstrap targeted achievement update completed."
+                    : "[MainWindow] Post-bootstrap targeted achievement update found no usable spool/achievement data.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                "[MainWindow] Post-bootstrap achievement update failed: " + ex);
+        }
+        finally
+        {
+            if (!Dispatcher.HasShutdownStarted &&
+                !Dispatcher.HasShutdownFinished)
+            {
+                await Dispatcher.InvokeAsync(
+                    HideBootstrapQuittingStatus);
+            }
+
+            statusPipeServer.Dispose();
+            bootstrapProcess.Dispose();
+        }
+    }
+
+    private async Task ReadBootstrapStatusAsync(
+        NamedPipeServerStream statusPipeServer,
+        Task pipeConnectionTask,
+        Task processExitTask)
+    {
+        try
+        {
+            Task completedTask =
+                await Task.WhenAny(
+                    pipeConnectionTask,
+                    processExitTask);
+
+            if (!pipeConnectionTask.IsCompleted)
+            {
+                if (completedTask == processExitTask)
+                {
+                    return;
+                }
+
+                await pipeConnectionTask;
+            }
+            else
+            {
+                await pipeConnectionTask;
+            }
+
+            using var reader = new StreamReader(
+                statusPipeServer,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                bufferSize: 1024,
+                leaveOpen: true);
+
+            string? status =
+                await reader.ReadLineAsync();
+
+            if (string.Equals(
+                    status,
+                    "QUITTING",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Dispatcher.HasShutdownStarted &&
+                    !Dispatcher.HasShutdownFinished)
+                {
+                    await Dispatcher.InvokeAsync(
+                        ShowBootstrapQuittingStatus);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                "[MainWindow] Bootstrap status channel error: " + ex.Message);
+        }
+    }
+
+    private void ShowBootstrapQuittingStatus()
+    {
+        BootstrapStatusText.Text =
+            "Please wait while the game is quitting...";
+
+        BootstrapStatusOverlay.Visibility =
+            Visibility.Visible;
+
+        StatusText.Text =
+            "Quitting Ubisoft game session...";
+
+        BootstrapStatusOverlay.Focus();
+    }
+
+    private void HideBootstrapQuittingStatus()
+    {
+        BootstrapStatusOverlay.Visibility =
+            Visibility.Collapsed;
+
+        if (string.Equals(
+                StatusText.Text,
+                "Quitting Ubisoft game session...",
+                StringComparison.Ordinal))
+        {
+            StatusText.Text = "Ready";
+        }
+    }
+
+    private async Task<bool> UpdateGameAchievementDataAsync(
+        AchievementUpdateRequest request)
+    {
+        GameCardData? game =
+            _games.FirstOrDefault(
+                item =>
+                    !string.IsNullOrWhiteSpace(request.EntitlementProductId) &&
+                    string.Equals(
+                        item.EntitlementProductId,
+                        request.EntitlementProductId,
+                        StringComparison.OrdinalIgnoreCase));
+
+        if (game == null &&
+            !string.IsNullOrWhiteSpace(request.SessionGameId))
+        {
+            game =
+                _games.FirstOrDefault(
+                    item =>
+                        string.Equals(
+                            item.SessionGameId,
+                            request.SessionGameId,
+                            StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (game == null &&
+            !string.IsNullOrWhiteSpace(request.AchievementGameId))
+        {
+            game =
+                _games.FirstOrDefault(
+                    item =>
+                        string.Equals(
+                            item.AchievementGameId,
+                            request.AchievementGameId,
+                            StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (game == null)
+        {
+            Console.WriteLine(
+                "[MainWindow] Targeted achievement update ignored; " +
+                "the game card could not be matched.");
+            return false;
+        }
+
+        string achievementGameId =
+            !string.IsNullOrWhiteSpace(request.AchievementGameId)
+                ? request.AchievementGameId
+                : game.AchievementGameId;
+
+        string spoolFile =
+            !string.IsNullOrWhiteSpace(request.SpoolFile)
+                ? request.SpoolFile
+                : game.SpoolFile;
+
+        if (!File.Exists(spoolFile))
+        {
+            (string SpoolFile, string AchievementGameId) resolvedSpool =
+                await Task.Run(
+                    () => ResolveSpoolFileForAchievementUpdate(
+                        request.SessionGameId,
+                        achievementGameId,
+                        spoolFile));
+
+            spoolFile =
+                resolvedSpool.SpoolFile;
+
+            achievementGameId =
+                resolvedSpool.AchievementGameId;
+        }
+
+        int total =
+            game.Total;
+
+        int unlocked =
+            0;
+
+        if (!string.IsNullOrWhiteSpace(spoolFile) &&
+            File.Exists(spoolFile))
+        {
+            AchievementStats? stats =
+                await Task.Run(
+                    () =>
+                    {
+                        try
+                        {
+                            _spoolManager.CreatePermanentBackups(
+                                new List<string> { spoolFile },
+                                _spoolManager.GetSpoolRoot());
+                        }
+                        catch (Exception backupException)
+                        {
+                            Console.WriteLine(
+                                "[Spool] Targeted backup failed: " +
+                                backupException.Message);
+                        }
+
+                        List<SpoolRecord> records =
+                            _spoolManager.GetRecords(
+                                spoolFile);
+
+                        List<AchievementDefinition> achievements =
+                            _achievementCache.GetAchievementsForGame(
+                                achievementGameId,
+                                records);
+
+                        if (achievements.Count == 0)
+                        {
+                            return (AchievementStats?)null;
+                        }
+
+                        return (AchievementStats?)new AchievementStats(
+                            achievements.Count,
+                            achievements.Count(
+                                achievement => achievement.IsUnlocked));
+                    });
+
+            if (!stats.HasValue)
+            {
+                Console.WriteLine(
+                    "[MainWindow] Targeted achievement update skipped; " +
+                    $"no achievement definitions were read for ID {achievementGameId}.");
+                return false;
+            }
+
+            total = stats.Value.Total;
+            unlocked = stats.Value.Unlocked;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SessionGameId))
+        {
+            game.SessionGameId =
+                request.SessionGameId;
+        }
+
+        game.AchievementGameId =
+            achievementGameId;
+
+        game.SpoolFile =
+            spoolFile;
+
+        game.Total =
+            total;
+
+        game.Unlocked =
+            unlocked;
+
+        if (_achievementTexts.TryGetValue(
+                game.EntitlementProductId,
+                out TextBlock? achievementText))
+        {
+            achievementText.Text =
+                total > 0
+                    ? $"{unlocked}/{total} achievements"
+                    : "No achievements";
+        }
+
+        if (_completionTexts.TryGetValue(
+                game.EntitlementProductId,
+                out TextBlock? completionText))
+        {
+            double completion =
+                total > 0
+                    ? (double)unlocked / total * 100.0
+                    : 0.0;
+
+            completionText.Text =
+                $"{completion:0.#}%";
+        }
+
+        LogActivity(
+            "ACHIEVEMENT_STATS_UPDATED",
+            $"Targeted card update | ProductID={game.EntitlementProductId} | " +
+            $"AchievementID={achievementGameId} | {unlocked}/{total} | " +
+            $"Spool={(string.IsNullOrWhiteSpace(spoolFile) ? "NONE" : Path.GetFileName(spoolFile))}");
+
+        Console.WriteLine(
+            $"[MainWindow] Updated achievement card only: {game.GameName} | {unlocked}/{total}.");
+
+        return true;
+    }
+
+    private (string SpoolFile, string AchievementGameId) ResolveSpoolFileForAchievementUpdate(
+        string sessionGameId,
+        string achievementGameId,
+        string spoolFile)
+    {
+        if (!string.IsNullOrWhiteSpace(spoolFile) &&
+            File.Exists(spoolFile))
+        {
+            return (spoolFile, achievementGameId);
+        }
+
+        if (!uint.TryParse(sessionGameId, out uint parsedSessionGameId))
+        {
+            return (spoolFile, achievementGameId);
+        }
+
+        try
+        {
+            var availableSpools =
+                new Dictionary<uint, string>();
+
+            foreach (string candidateFile in _spoolManager.FindSpoolFiles())
+            {
+                if (uint.TryParse(
+                        _spoolManager.GetGameId(candidateFile),
+                        out uint candidateId) &&
+                    _variantResolver.IsSameFamily(
+                        parsedSessionGameId,
+                        candidateId) &&
+                    !availableSpools.ContainsKey(candidateId))
+                {
+                    availableSpools.Add(
+                        candidateId,
+                        candidateFile);
+                }
+            }
+
+            var searchOrder = new List<uint>();
+
+            if (uint.TryParse(achievementGameId, out uint preferredAchievementId) &&
+                availableSpools.ContainsKey(preferredAchievementId))
+            {
+                searchOrder.Add(preferredAchievementId);
+            }
+
+            foreach (uint candidateId in
+                     GameIdMappingOverrides.GetSpoolSearchOrder(
+                         parsedSessionGameId,
+                         parsedSessionGameId,
+                         _gameDatabase,
+                         _variantResolver))
+            {
+                if (!searchOrder.Contains(candidateId))
+                {
+                    searchOrder.Add(candidateId);
+                }
+            }
+
+            foreach (uint candidateId in searchOrder)
+            {
+                if (availableSpools.TryGetValue(
+                        candidateId,
+                        out string? candidateFile))
+                {
+                    Console.WriteLine(
+                        "[MainWindow] Targeted spool lookup resolved " +
+                        $"family ID {candidateId}: {candidateFile}");
+
+                    return (
+                        candidateFile,
+                        candidateId.ToString());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                "[MainWindow] Targeted spool lookup failed: " +
+                ex.Message);
+        }
+
+        return (spoolFile, achievementGameId);
+    }
+
+    private readonly record struct AchievementStats(
+        int Total,
+        int Unlocked);
+
+    private async Task CheckForAutomaticUpdateAsync()
+    {
+        if (!_settings.AutoUpdateCheck)
+        {
+            return;
+        }
+
+        if (_settings.LastUpdateCheckUtc.HasValue &&
+            DateTimeOffset.UtcNow -
+                _settings.LastUpdateCheckUtc.Value <
+            TimeSpan.FromDays(1))
+        {
+            return;
+        }
+
+        try
+        {
+            GitHubReleaseInfo? update =
+                await _settings.CheckForUpdateAsync();
+
+            _settings.LastUpdateCheckUtc =
+                DateTimeOffset.UtcNow;
+
+            _settings.Save();
+
+            if (update == null)
+            {
+                return;
+            }
+
+            WpfMessageBoxResult result =
+                WpfMessageBox.Show(
+                    $"A newer UbiSlot version is available.\n\n" +
+                    $"{update.Name}\n" +
+                    $"{update.TagName}\n\n" +
+                    "Open the GitHub release page?",
+                    "UbiSlot Update",
+                    WpfMessageBoxButton.YesNo,
+                    WpfMessageBoxImage.Information);
+
+            if (result == WpfMessageBoxResult.Yes &&
+                !string.IsNullOrWhiteSpace(update.HtmlUrl))
+            {
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName = update.HtmlUrl,
+                        UseShellExecute = true
+                    });
+            }
+        }
+        catch
+        {
+        }
+    }
+    private void ApplyMainWindowTheme()
+    {
+        if (_settings.IsDarkTheme)
+        {
+            Background =
+                new SolidColorBrush(
+                    WpfColor.FromRgb(
+                        16,
+                        16,
+                        20));
+
+            Foreground =
+                WpfBrushes.White;
+        }
+        else
+        {
+            Background =
+                new SolidColorBrush(
+                    WpfColor.FromRgb(
+                        245,
+                        245,
+                        248));
+
+            Foreground =
+                new SolidColorBrush(
+                    WpfColor.FromRgb(
+                        25,
+                        25,
+                        30));
+        }
+    }
+
+    private async void RefreshButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        LogActivity(
+            "REFRESH",
+            "Library refresh requested");
+
+        GameSearchBox.Clear();
+
+
+        SearchPopup.IsOpen =
+            false;
+
+
+        await LoadGamesAsync();
+    }
+
+    private void SupportButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        LogActivity(
+            "SUPPORT_OPEN",
+            "Support window opened");
+
+        var supportWindow =
+            new SupportWindow
+            {
+                Owner =
+                    this
+            };
+
+
+        supportWindow.ShowDialog();
+    }
+
+    private void SettingsButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        LogActivity(
+            "SETTINGS_OPEN",
+            "Settings window opened");
+
+        var settingsWindow =
+            new SettingsWindow
+            {
+                Owner =
+                    this
+            };
+
+        bool? result =
+            settingsWindow.ShowDialog();
+
+        if (result != true)
+        {
+            return;
+        }
+
+        _settings =
+            UbiSlotSettings.Load();
+
+        ApplyMainWindowTheme();
+
+        LogActivity(
+            "SETTINGS_SAVE",
+            "Settings saved");
+
+        _ = ReloadAfterSettingsAsync();
+    }
+
+
+    private async Task ReloadAfterSettingsAsync()
+    {
+        GameSearchBox.Clear();
+        SearchPopup.IsOpen = false;
+
+        await LoadGamesAsync();
+    }
+
+    private static readonly object ActivityLogSync =
+        new();
+
+    private static readonly Regex PinEventRegex =
+        new(
+            @"^\[[^\]]+\]\s+\[(PIN_GAME|UNPIN_GAME)\]\s+ID=(\d+)",
+            RegexOptions.Compiled |
+            RegexOptions.CultureInvariant |
+            RegexOptions.IgnoreCase);
+
+    private static readonly Regex WindowsPathRegex =
+        new(
+            @"(?i)(?<![A-Za-z0-9_])(?:[A-Z]:\\|\\\\)[^\r\n\t""<>|]*",
+            RegexOptions.Compiled |
+            RegexOptions.CultureInvariant);
+
+    private static string ActivityLogDirectory =>
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "UbiSlot_Cache");
+
+    private static string ActivityLogFilePath =>
+        Path.Combine(
+            ActivityLogDirectory,
+            "UbiSlot.log");
+
+    private static void LogActivity(
+        string eventName,
+        string message)
+    {
+        try
+        {
+            string line =
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] " +
+                $"[{eventName}] " +
+                SanitizeLogText(message);
+
+            lock (ActivityLogSync)
+            {
+                Directory.CreateDirectory(
+                    ActivityLogDirectory);
+
+                File.AppendAllText(
+                    ActivityLogFilePath,
+                    line + Environment.NewLine);
+            }
+        }
+        catch
+        {
+            // Logging...
+        }
+    }
+
+    private static void WritePinChange(
+        bool pinned,
+        uint gameId,
+        string gameName)
+    {
+        LogActivity(
+            pinned
+                ? "PIN_GAME"
+                : "UNPIN_GAME",
+            $"ID={gameId} | Name={gameName}");
+    }
+
+    private static HashSet<uint> LoadPinnedGameIds()
+    {
+        var pinnedIds =
+            new HashSet<uint>();
+
+        try
+        {
+            if (!File.Exists(ActivityLogFilePath))
+            {
+                return pinnedIds;
+            }
+
+            lock (ActivityLogSync)
+            {
+                foreach (string rawLine in
+                         File.ReadLines(ActivityLogFilePath))
+                {
+                    Match match =
+                        PinEventRegex.Match(rawLine);
+
+                    if (!match.Success)
+                    {
+                        continue;
+                    }
+
+                    if (!uint.TryParse(
+                            match.Groups[2].Value,
+                            out uint gameId))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(
+                            match.Groups[1].Value,
+                            "PIN_GAME",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        pinnedIds.Add(gameId);
+                    }
+                    else
+                    {
+                        pinnedIds.Remove(gameId);
+                    }
+                }
+            }
+        }
+        catch
+        {
+
+        }
+
+        return pinnedIds;
+    }
+
+    private static string SanitizeLogText(
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string sanitized =
+            value;
+
+        ReplacePathRoot(
+            ref sanitized,
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "[LOCALAPPDATA]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.ApplicationData),
+            "[APPDATA]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData),
+            "[PROGRAMDATA]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.UserProfile),
+            "[USERPROFILE]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.DesktopDirectory),
+            "[DESKTOP]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            Path.GetTempPath(),
+            "[TEMP]");
+
+        ReplacePathRoot(
+            ref sanitized,
+            AppContext.BaseDirectory,
+            "[APP]");
+
+        string? processPath =
+            Environment.ProcessPath;
+
+        if (!string.IsNullOrWhiteSpace(processPath))
+        {
+            ReplacePathRoot(
+                ref sanitized,
+                Path.GetDirectoryName(processPath),
+                "[APP]");
+        }
+
+        ReplaceText(
+            ref sanitized,
+            Environment.UserName,
+            "[USER]");
+
+        ReplaceText(
+            ref sanitized,
+            Environment.MachineName,
+            "[MACHINE]");
+
+        if (!string.IsNullOrWhiteSpace(
+                Environment.UserDomainName))
+        {
+            ReplaceText(
+                ref sanitized,
+                Environment.UserDomainName,
+                "[DOMAIN]");
+        }
+
+        sanitized =
+            WindowsPathRegex.Replace(
+                sanitized,
+                "[PATH]");
+
+        return sanitized;
+    }
+
+    private static void ReplacePathRoot(
+        ref string value,
+        string? root,
+        string replacement)
+    {
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            return;
+        }
+
+        string normalizedRoot =
+            root.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+
+        if (string.IsNullOrWhiteSpace(normalizedRoot))
+        {
+            return;
+        }
+
+        value =
+            value.Replace(
+                normalizedRoot,
+                replacement,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ReplaceText(
+        ref string value,
+        string? text,
+        string replacement)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        value =
+            value.Replace(
+                text,
+                replacement,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class SpoolEntry
+    {
+        public string AchievementGameId { get; init; }
+            = string.Empty;
+
+
+        public string GameName { get; init; }
+            = string.Empty;
+
+
+        public string NormalizedName { get; init; }
+            = string.Empty;
+
+
+        public string SpoolFile { get; init; }
+            = string.Empty;
+    }
+
+    private sealed class GameCardData
+    {
+        public string EntitlementProductId { get; init; }
+            = string.Empty;
+
+
+        public string SessionGameId { get; set; }
+            = string.Empty;
+
+
+        public string AchievementGameId { get; set; }
+            = string.Empty;
+
+
+        public string GameName { get; init; }
+            = string.Empty;
+
+
+        public string SpoolFile { get; set; }
+            = string.Empty;
+
+
+        public int Unlocked { get; set; }
+
+
+        public int Total { get; set; }
+
+
+        public string? CoverPath { get; set; }
+
+
+        public bool IsPinned { get; set; }
+    }
+}
