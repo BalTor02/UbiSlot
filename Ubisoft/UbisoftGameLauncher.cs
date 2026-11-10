@@ -1,4 +1,5 @@
-﻿using System;
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -110,7 +111,7 @@ public static class UbisoftGameLauncher
             {
                 Console.WriteLine(
                     "[Ubisoft Safety] " +
-                    $"Different Ubisoft game appeared: {runningGameId.Value}");
+                    $"Different game appeared: {runningGameId.Value}");
 
                 return false;
             }
@@ -213,7 +214,7 @@ public static class UbisoftGameLauncher
     public static bool OwnsActiveSession() =>
         _running;
 
-    public static void Shutdown()
+    public static bool Shutdown()
     {
         if (_externalGameRunning)
         {
@@ -228,22 +229,32 @@ public static class UbisoftGameLauncher
             _externalGameRunning = false;
             _currentGameId = 0;
 
-            return;
+            return true;
         }
 
         if (!_running)
         {
-            return;
+            return true;
         }
 
         Console.WriteLine(
             "[Ubisoft Game Session] " +
             $"Ending UbiSlot session for game {_currentGameId}...");
 
+        bool quitSucceeded = false;
+
         try
         {
-            UbisoftConnectSdk.Quit();
-            UbisoftConnectSdk.Release();
+            Console.WriteLine(
+                "[Ubisoft Game Session] Calling UPLAY_Quit and waiting for it to return...");
+
+            quitSucceeded =
+                UbisoftConnectSdk.Quit();
+
+            Console.WriteLine(
+                quitSucceeded
+                    ? "[Ubisoft Game Session] UPLAY_Quit completed successfully."
+                    : "[Ubisoft Game Session] UPLAY_Quit did not report success.");
         }
         finally
         {
@@ -255,6 +266,8 @@ public static class UbisoftGameLauncher
                 "[Ubisoft Game Session] " +
                 "UbiSlot session ended.");
         }
+
+        return quitSucceeded;
     }
 
     public static bool IsRunning() =>
@@ -331,6 +344,16 @@ public static class UbisoftGameLauncher
 
             if (string.IsNullOrWhiteSpace(exePath))
             {
+                continue;
+            }
+
+            if (IsCurrentExecutablePath(exePath))
+            {
+                Console.WriteLine(
+                    "[Ubisoft Safety] " +
+                    "Ignoring UbiSlot's own executable as a game process: " +
+                    exePath);
+
                 continue;
             }
 
@@ -514,7 +537,6 @@ public static class UbisoftGameLauncher
         }
         catch
         {
-            // Invalid/stale base64 is treated as no executable path
         }
 
         return null;
@@ -588,7 +610,6 @@ public static class UbisoftGameLauncher
                 }
                 catch
                 {
-                    // Fall through to command-line verification.
                 }
 
                 try
@@ -606,7 +627,6 @@ public static class UbisoftGameLauncher
                 }
                 catch
                 {
-                    // Ignore inaccessible processes.
                 }
             }
         }
@@ -644,6 +664,69 @@ public static class UbisoftGameLauncher
             StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsCurrentExecutableRegisteredByUbisoft(
+        int launcherProcessId)
+    {
+        string? commandLine =
+            TryGetProcessCommandLine(launcherProcessId);
+
+        if (string.IsNullOrWhiteSpace(commandLine))
+        {
+            return false;
+        }
+
+        string? registeredExecutable =
+            TryParseExecutablePath(commandLine);
+
+        return !string.IsNullOrWhiteSpace(registeredExecutable) &&
+               IsCurrentExecutablePath(registeredExecutable);
+    }
+
+    private static bool IsCurrentExecutablePath(
+        string executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return false;
+        }
+
+        string? currentExecutablePath =
+            Environment.ProcessPath;
+
+        if (string.IsNullOrWhiteSpace(currentExecutablePath))
+        {
+            try
+            {
+                using Process currentProcess =
+                    Process.GetCurrentProcess();
+
+                currentExecutablePath =
+                    currentProcess.MainModule?.FileName;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(currentExecutablePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(executablePath),
+                Path.GetFullPath(currentExecutablePath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static string? GetRunningUbisoftGameName()
     {
         uint? gameId =
@@ -656,6 +739,7 @@ public static class UbisoftGameLauncher
 
         return GetGameName(gameId.Value);
     }
+
 
     private static uint? TryParseGameId(
         string commandLine)
