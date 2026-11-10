@@ -1,7 +1,5 @@
-<div align="center">
-
+ <div align="center">
   <img src="UI/UbiSlot_logo.png" alt="UbiSlot Logo" width="180" />
-
   <br><br>
 
   <a href="https://github.com/BalTor02/UbiSlot/releases/tag/v0.3.0-beta"><img src="https://img.shields.io/badge/Download-Latest_Release-3D1B5D?style=flat-square&logo=github&logoColor=white" alt="Latest Release" /></a>
@@ -12,48 +10,34 @@
 </div>
 
 > [!CAUTION]
-> **Use UbiSlot at your own discretion. Always create a backup of your Ubisoft achievement data before modifying anything. UbiSlot creates permanent backups of detected Ubisoft achievement spool files before making changes. Modifying achievement data may carry account or service-related risks.**
+> **Use UbiSlot at your own risk. Always keep a backup of your Ubisoft achievement data before making changes. Do not abuse the usage of UbiSlot.**
 
 ---
 
 ## Overview
 
-UbiSlot is a Windows desktop application for managing and unlocking Ubisoft Connect achievements using locally stored Ubisoft achievement data.
-
-UbiSlot scans Ubisoft's local ownership and achievement data, identifies supported Ubisoft games, displays their achievements and icons, and provides an interface for selecting and unlocking achievements.
+UbiSlot is a Windows application that lets you manage and unlock Ubisoft Connect achievements. It finds your Ubisoft games, displays their achievements, and lets you choose which achievements to unlock.
 
 UbiSlot is currently in **beta testing**.
 
----
-
 ## Current Version
 
-**UbiSlot `v0.3.2-beta`**
+**UbiSlot `v0.4.0-beta`**
 
-This release is feature-complete for the current development cycle, but thorough testing is still required across different Ubisoft games and installations. Unknown bugs and game-specific compatibility issues may remain.
+This version includes the Load feature where players can manually select the achievement file. However, UbiSlot still needs testing with more Ubisoft games and different installations. Some bugs or compatibility issues may remain.
 
 ---
 
 ## Features
 
-- **Ubisoft Game Library:** Detects Ubisoft-owned games from locally stored Ubisoft ownership data.
-- **Game Identification:** Matches Ubisoft Game IDs with their corresponding game names using the bundled game database.
-- **Achievement Browser:** Displays achievement names, descriptions, IDs, icons, and unlock status.
-- **Achievement Search:** Search achievements by name or Achievement ID in real time.
-- **Achievement Sorting:** Sort achievements by Name, ID, Date Achieved, Locked, or Unlocked.
-- **Date Sorting:** Sort achieved achievements from oldest to newest.
-- **Achievement Selection:** Select individual locked achievements before unlocking them.
-- **Select All Locked:** Select or deselect all currently locked achievements at once.
-- **Game Search:** Filter the Ubisoft game library by game name or Game ID.
-- **Game Covers:** Automatically retrieves compatible cover artwork and stores it locally for future use.
-- **Automatic Backups:** Creates permanent backups of relevant Ubisoft achievement spool data before making changes.
-- **Session Restore:** Restore the achievement data captured when UbiSlot opened the current game session.
-- **Configurable Backup Location:** Choose where UbiSlot stores its backups.
-- **Dark and Light Themes:** Switch between dark and light interface themes.
-- **Library Settings:** Control game-name, completion, and zero-achievement game visibility.
+- **Ubisoft Game Library:** Automatically finds Ubisoft games associated with your account.
+- **Game Identification:** Identifies games and displays their correct names and covers.
+- **Game Instance:** Handles game sessions, creates game instance including games that are already running.
+- **Achievement Browsing:** View achievement names, descriptions, IDs, icons, and unlock status.
+- **Achievement Selection:** Choose individual or every achievement to unlock.
+- **Automatic Backups:** Creates permanent backups of achievement data before making changes.
+- **Achievement Restore:** Restore the achievement data saved when you opened the current game session.
 - **Automatic Update Checking:** Check for newer UbiSlot releases.
-- **Custom Dialogues:** Uses custom confirmation, information, and error dialogue windows.
-- **Ubisoft Session Handling:** Handles Ubisoft-managed game sessions and already-running Ubisoft games.
 
 ---
 
@@ -62,87 +46,40 @@ This release is feature-complete for the current development cycle, but thorough
 Download the latest beta release from the [Releases](https://github.com/BalTor02/UbiSlot/releases) page.
 
 1. Download the latest **UbiSlot ZIP**.
-2. Extract the ZIP file to a location of your choice.
-3. Make sure **Ubisoft Connect** is installed and logged in.
+2. Extract the ZIP file.
+3. Make sure **Ubisoft Connect** is installed, running and you are logged in.
 4. Run **UbiSlot.exe**.
-5. Wait for UbiSlot to scan the locally available Ubisoft data and populate the game library.
-
-No separate installer is currently required.
+5. Wait for UbiSlot to scan your Ubisoft data and load your game library.
 
 ---
 
-## How to use
+## How to use (Detailed)
 
-1. Make sure **Ubisoft Connect is logged in and running**.
+1. Make sure **Ubisoft Connect is running and you are logged in**.
 2. Make sure **no Ubisoft game is currently running in the background**.
-3. Launch **UbiSlot** and allow the library to load. On some systems, this may take up to a couple of minutes.
-4. UbiSlot scans Ubisoft's local ownership data and displays supported Ubisoft games.
-5. Select a game to open its **Achievement Manager**.
-6. UbiSlot starts or attaches to the appropriate Ubisoft game session as required.
-7. In the Achievement Manager:
+3. Launch **UbiSlot** and wait for your game library to load. This may take a couple of minutes on some systems.
+4. Select the game.
+5. UbiSlot will start a game session.
+6. In the Achievement Manager:
    - Use **Search** to find achievements by name or Achievement ID.
-   - Use **Sort** to organize achievements by Name, ID, Date Achieved, Locked, or Unlocked.
-   - **Date Achieved** sorts from oldest to newest.
-   - Use **Select All Locked** to select all currently locked achievements.
-   - Select individual achievements using their checkboxes.
-8. Click **Get Achievement** and confirm the unlock.
-9. UbiSlot writes the selected achievement changes immediately.
-10. Keep the Achievement Manager open if you may want to use **Restore Original** during the same session.
+   - Use **Sort** to arrange achievements by Name, ID, Date Achieved, Locked, or Unlocked.
+   - **Date Achieved** arranges unlocked achievements from oldest to newest.
+   - Use **Select All Locked** to select all locked achievements.
+   - Use the checkboxes to select individual achievements.
+7. Click **Get Achievement** and confirm your selection. UbiSlot applies the selected changes immediately.
+8. Keep the Achievement Manager open if you may need to use **Restore Original** during the same session.
+9. Once the **Achievement Window is closed**, achievements would be synchronized immediately and **cannot be restored.**
+10. Close UbiSlot before launching the game.
 
 ### Restore Original
 
-**Restore Original** restores the achievement data captured when UbiSlot opened the game.
-
-It removes UbiSlot's achievement changes made during the current session. It does **not** lock achievements that have already been synchronized.
-
----
-
-## How it works
-
-| Step | Component | Description |
-| :--- | :--- | :--- |
-| **1** | **Ubisoft Ownership Data** | UbiSlot reads Ubisoft's locally stored ownership data to identify Ubisoft Game IDs available to the current user. |
-| **2** | **Game Database** | Ubisoft Game IDs are matched against the bundled `UplayGames.txt` database to obtain game names. |
-| **3** | **Game Cover** | The identified game name can be used to find compatible cover artwork, which is cached locally. |
-| **4** | **Achievement Archive** | UbiSlot locates the achievement archive corresponding to the Ubisoft Game ID. |
-| **5** | **Achievement Data** | Achievement IDs, names, descriptions, and local unlock information are read from the achievement data. |
-| **6** | **Achievement Icons** | Achievement icons are extracted from the corresponding achievement archive and cached locally. |
-| **7** | **Achievement Selection** | The user can search, sort, and select the achievements they want to unlock. |
-| **8** | **Backup** | UbiSlot creates permanent backups of the relevant achievement spool data before making changes. |
-| **9** | **Unlock** | The selected achievements are written to the appropriate local Ubisoft achievement data. |
-
----
-
-## Backups
-
-UbiSlot creates permanent backups of detected Ubisoft achievement spool files before making changes.
-
-A backup is also captured when an achievement session is opened so that the **Restore Original** function can restore the local achievement data from the beginning of that session.
-
-> [!CAUTION]
-> Although UbiSlot creates backups automatically, maintaining your own additional backup is strongly recommended.
+**Restore Original** brings back the achievement data saved when you opened the game session. It removes the changes made by UbiSlot during that session. However, it **cannot lock achievements that have already been synchronized**.
 
 ---
 
 ## Important
 
-UbiSlot modifies locally stored Ubisoft achievement spool data.
-
-Achievement unlocking and spool-data modification may carry risks. Avoid unlocking all achievements at once, especially during beta testing.
-
-Once achievements have been synchronized, **Restore Original cannot be used to lock those synchronized achievements again through UbiSlot**.
-
----
-
-## Notes
-
-Steam achievement integration is **not included**.
-
-Steam is used only as a source for compatible game cover artwork. UbiSlot does not use Steam for achievement data or Ubisoft game ownership.
-
-UbiSlot does not bypass Ubisoft ownership, DRM, authentication, or server-side security.
-
-Game compatibility depends on the availability and structure of Ubisoft's local achievement data.
+UbiSlot changes achievement data stored locally by Ubisoft Connect. Changing achievement data may carry risks. UbiSlot does not bypass Ubisoft ownership, DRM, authentication, or server-side/multiplayer achievements. Avoid unlocking all achievements at once or starting multiple games in an instance. Once achievements have been synchronized, **UbiSlot cannot lock it again.** Game compatibility depends on my ownership. I do not own every single Ubisoft titles.
 
 ---
 
@@ -158,13 +95,13 @@ Game compatibility depends on the availability and structure of Ubisoft's local 
 
 ## Support the Project
 
-If UbiSlot saved you some time, prevented tedious grinding, or helped you achieve 100% completion, consider supporting the repository. Your feedback and support help keep the project maintained and visible to the community.
+If UbiSlot has helped you unlock achievements or complete your games, consider supporting the project. Your feedback and support help the project reach more users and stay maintained. All funds go towards buying new titles and testing. You can also help by adding me to your Steam family.
 
 ### Ways to Support
 
 - **⭐ Star this Repository:** Click the **Star** button at the top right of this page.
 - **👤 Follow the Profile:** Follow [@BalTor02](https://github.com/BalTor02) for future projects and releases.
-- **💖 Sponsor the Work:** Support the development and maintenance of UbiSlot through GitHub Sponsors.
+- **💖 Sponsor the Work:** Support UbiSlot's development and maintenance through GitHub Sponsors.
 
 <div align="center">
   <a href="https://github.com/sponsors/BalTor02">
@@ -176,11 +113,11 @@ If UbiSlot saved you some time, prevented tedious grinding, or helped you achiev
 
 ## Disclaimer
 
-UbiSlot is an independent community project and is not affiliated with, endorsed by, or sponsored by Ubisoft Entertainment.
+UbiSlot is an independent community project. It is not affiliated with, endorsed by, or sponsored by Ubisoft Entertainment.
 
 Ubisoft, Ubisoft Connect, and related trademarks belong to their respective owners.
 
-UbiSlot is provided for educational, archival, and personal-use purposes. Users are responsible for how they use the software and for complying with the terms and policies applicable to their Ubisoft account and games.
+UbiSlot is provided for educational, archival, and personal-use purposes. Users are responsible for how they use the software and for following the terms and policies that apply to their Ubisoft accounts and games.
 
 ---
 
@@ -188,71 +125,51 @@ UbiSlot is provided for educational, archival, and personal-use purposes. Users 
 
 ### 1. What is UbiSlot?
 
-> UbiSlot is a Windows desktop application for managing and unlocking Ubisoft Connect achievements using locally stored Ubisoft achievement data.
+> UbiSlot is a Windows application that lets you manage and unlock Ubisoft Connect achievements.
 
 ### 2. Does UbiSlot use Steam?
 
-> Not for achievements or ownership. Steam is only used as a source for compatible game cover artwork.
+> Not for achievements or game ownership. Steam is only used to find compatible game cover images.
 
 ### 3. Does UbiSlot modify my game files?
 
-> UbiSlot works with Ubisoft's locally stored achievement data rather than modifying the game's main installation files.
+> No. UbiSlot works with Ubisoft's locally stored achievement data. It does not modify the main game installation files.
 
-### 4. Where does UbiSlot get the games from?
+### 4. Where does UbiSlot get my games from?
 
-> UbiSlot reads locally stored Ubisoft ownership data, identifies Ubisoft Game IDs, and matches those IDs against its bundled game database.
+> UbiSlot finds your games using ownership information stored locally by Ubisoft Connect. It then matches them with its included game database.
 
 ### 5. Do I need Ubisoft Connect installed?
 
-> Yes. UbiSlot is designed around Ubisoft Connect's locally stored ownership, achievement, and session data.
+> Yes. UbiSlot uses information stored by Ubisoft Connect, so it must be installed and running on your system.
 
 ### 6. Do I need to own the game?
 
-> Yes. You need to own a legitimate copy of the Ubisoft game and have it associated with your Ubisoft account. UbiSlot does not support cracked or pirated games.
+> Yes. You must own a legitimate copy of the Ubisoft game, and it must be associated with your Ubisoft account. Cracked or pirated games are not supported.
 
-### 7. Will UbiSlot delete my existing achievement data?
+### 7. Can I unlock all achievements at once?
 
-> UbiSlot creates permanent backups of detected achievement spool files before making changes. However, maintaining your own backup is still strongly recommended.
+> Yes, but this is **not recommended during beta testing**. It is safer to avoid unlocking all achievements at once.
 
-### 8. Can I unlock individual achievements?
+### 8. Can UbiSlot lock an achievement again?
 
-> Yes. You can select individual locked achievements before unlocking them.
+> **Restore Original** can bring back the achievement data saved when you opened the current session. However, it cannot lock achievements that have already been synchronized.
 
-### 9. Can I unlock all achievements at once?
+### 9. Can I unlock achievements for all the games?
 
-> Yes, but this is **not recommended during beta testing**. Avoid unlocking all achievements at once.
+> Yes, but do not unlock them back-to-back as that may result in soft lock of account. Take a break before launching next game.
 
-### 10. Why are some game covers missing?
+### 10. Something isn't working. What should I do?
 
-> Game covers are matched using the identified game name. Some Ubisoft titles, regional versions, editions, or differently named releases may not have a compatible cover available from the image source.
-
-### 11. Why do some achievements have no icon?
-
-> UbiSlot extracts achievement icons from the corresponding Ubisoft achievement archive. If an icon is not present in the archive, UbiSlot cannot display it.
-
-### 12. Can UbiSlot lock an achievement again?
-
-> UbiSlot's **Restore Original** function can restore the local achievement data captured at the beginning of the current session. It cannot lock achievements that have already been synchronized.
-
-### 13. Is UbiSlot affiliated with Ubisoft?
-
-> No. UbiSlot is an independent community project and is not affiliated with, endorsed by, or sponsored by Ubisoft.
-
-### 14. Is UbiSlot open source?
-
-> Yes. The source code is publicly available in this repository under the MIT License. UbiSlot itself is free to use. If someone charged you money specifically for UbiSlot, you were likely scammed.
-
-### 15. Something isn't working. What should I do?
-
-> First, make sure Ubisoft Connect is installed and logged in, and that the relevant Ubisoft game has locally available achievement data.
+> First, make sure you have followed all the steps properly
+> 
+> If the problem continues, open a [GitHub Issue](https://github.com/BalTor02/UbiSlot/issues) and provide:
 >
-> If the problem persists, open a [GitHub Issue](https://github.com/BalTor02/UbiSlot/issues) and provide:
->
-> - Ubisoft game affected
-> - What you expected to happen
+> - The Ubisoft game affected
+> - Spool file ID
 > - What actually happened
 >
-> Do not upload personal Ubisoft account information or private files to an issue.
+> **Do not upload personal Ubisoft account information or private files to a GitHub issue.**
 
 ---
 
